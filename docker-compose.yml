@@ -33,6 +33,7 @@ services:
       DB_PASSWORD: orderly
       DB_NAME: orderly_auth
       TYPEORM_SYNC: 'true'
+      JWT_SECRET: orderly-dev-secret
     ports:
       - '3000:3000'
 
@@ -45,6 +46,7 @@ services:
     environment:
       NODE_ENV: production
       AUTH_SERVICE_URL: http://auth-service:3000/v1/auth/register
+      AUTH_LOGIN_URL: http://auth-service:3000/v1/auth/login
       PORT: 3000
     ports:
       - '3001:3000'

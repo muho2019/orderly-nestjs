@@ -6,20 +6,19 @@ import { FormEvent, useState } from 'react';
 type FormState =
   | { status: 'idle' }
   | { status: 'submitting' }
-  | { status: 'success'; message: string }
+  | { status: 'success'; token: string }
   | { status: 'error'; message: string };
 
-export default function RegisterPage(): JSX.Element {
+export default function LoginPage(): JSX.Element {
   const [formState, setFormState] = useState<FormState>({ status: 'idle' });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+
     const email = String(formData.get('email') ?? '').trim();
     const password = String(formData.get('password') ?? '').trim();
-    const nameRaw = formData.get('name');
-    const name = typeof nameRaw === 'string' ? nameRaw.trim() : undefined;
 
     if (!email || !password) {
       setFormState({ status: 'error', message: '이메일과 비밀번호를 입력해주세요.' });
@@ -31,34 +30,28 @@ export default function RegisterPage(): JSX.Element {
       return;
     }
 
-    const payload = {
-      email,
-      password,
-      name: name ? name : undefined
-    };
-
     setFormState({ status: 'submitting' });
 
-    const response = await fetch('/api/register', {
+    const response = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ email, password })
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      setFormState({ status: 'success', message: `${data.email ?? payload.email}님, 가입이 완료되었습니다.` });
-      form.reset();
+    const data = await response
+      .json()
+      .catch(() => ({ message: '로그인 중 오류가 발생했습니다.' }));
+
+    if (!response.ok) {
+      setFormState({
+        status: 'error',
+        message: data?.message ?? '로그인에 실패했습니다.'
+      });
       return;
     }
 
-    const problem = await response
-      .json()
-      .catch(() => ({ message: '회원 등록에 실패했습니다. 잠시 후 다시 시도해주세요.' }));
-    setFormState({
-      status: 'error',
-      message: problem?.message ?? '회원 등록 중 오류가 발생했습니다.'
-    });
+    setFormState({ status: 'success', token: data.accessToken ?? '' });
+    form.reset();
   }
 
   const isSubmitting = formState.status === 'submitting';
@@ -66,9 +59,9 @@ export default function RegisterPage(): JSX.Element {
   return (
     <section className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold">회원 등록</h2>
+        <h2 className="text-2xl font-semibold">로그인</h2>
         <p className="text-sm text-slate-300">
-          주문 서비스를 이용하려면 이메일과 비밀번호를 입력하여 계정을 생성하세요.
+          발급된 계정으로 로그인하여 Orderly 서비스를 체험해 보세요.
         </p>
       </div>
 
@@ -99,22 +92,8 @@ export default function RegisterPage(): JSX.Element {
             minLength={8}
             required
             className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="8자 이상 비밀번호"
-            autoComplete="new-password"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="name" className="block text-sm font-medium text-slate-200">
-            이름 (선택)
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="홍길동"
-            autoComplete="name"
+            placeholder="비밀번호"
+            autoComplete="current-password"
           />
         </div>
 
@@ -123,21 +102,15 @@ export default function RegisterPage(): JSX.Element {
           disabled={isSubmitting}
           className="inline-flex items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600"
         >
-          {isSubmitting ? '등록 중...' : '회원가입'}
+          {isSubmitting ? '로그인 중...' : '로그인'}
         </button>
       </form>
 
-      <p className="text-sm text-slate-400">
-        이미 계정이 있으신가요?{' '}
-        <Link href="/login" className="text-emerald-400 underline-offset-4 hover:underline">
-          로그인하러 가기
-        </Link>
-      </p>
-
       {formState.status === 'success' && (
-        <p className="rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-          {formState.message}
-        </p>
+        <div className="space-y-2 rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+          <p>로그인 성공! 발급된 토큰:</p>
+          <code className="block break-all text-xs text-emerald-100">{formState.token}</code>
+        </div>
       )}
 
       {formState.status === 'error' && (
@@ -145,6 +118,13 @@ export default function RegisterPage(): JSX.Element {
           {formState.message}
         </p>
       )}
+
+      <p className="text-sm text-slate-400">
+        아직 계정이 없으신가요?{' '}
+        <Link href="/register" className="text-emerald-400 underline-offset-4 hover:underline">
+          회원가입하러 가기
+        </Link>
+      </p>
     </section>
   );
 }
