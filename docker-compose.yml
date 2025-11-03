@@ -1,0 +1,158 @@
+version: '3.9'
+
+services:
+  postgres-auth:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orderly
+      POSTGRES_PASSWORD: orderly
+      POSTGRES_DB: orderly_auth
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - orderly-network
+
+  postgres-orders:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orderly
+      POSTGRES_PASSWORD: orderly
+      POSTGRES_DB: orderly_orders
+    ports:
+      - '5434:5432'
+    volumes:
+      - postgres-orders-data:/var/lib/postgresql/data
+    networks:
+      - orderly-network
+
+  postgres-payments:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orderly
+      POSTGRES_PASSWORD: orderly
+      POSTGRES_DB: orderly_payments
+    ports:
+      - '5435:5432'
+    volumes:
+      - postgres-payments-data:/var/lib/postgresql/data
+    networks:
+      - orderly-network
+
+  postgres-catalog:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orderly
+      POSTGRES_PASSWORD: orderly
+      POSTGRES_DB: orderly_catalog
+    ports:
+      - '5436:5432'
+    volumes:
+      - postgres-catalog-data:/var/lib/postgresql/data
+    networks:
+      - orderly-network
+
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    restart: unless-stopped
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: 'yes'
+    ports:
+      - '2181:2181'
+    networks:
+      - orderly-network
+
+  kafka:
+    image: bitnami/kafka:3.7
+    restart: unless-stopped
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
+    depends_on:
+      - zookeeper
+    ports:
+      - '9092:9092'
+    networks:
+      - orderly-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: orderly
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - '8080:8080'
+    depends_on:
+      - kafka
+    networks:
+      - orderly-network
+
+  api-gateway:
+    build:
+      context: ./apps/api-gateway
+    depends_on:
+      - kafka
+    networks:
+      - orderly-network
+
+  auth-service:
+    build:
+      context: ./apps/services/auth-service
+    depends_on:
+      - postgres-auth
+      - kafka
+    networks:
+      - orderly-network
+
+  orders-service:
+    build:
+      context: ./apps/services/orders-service
+    depends_on:
+      - postgres-orders
+      - kafka
+    networks:
+      - orderly-network
+
+  payments-service:
+    build:
+      context: ./apps/services/payments-service
+    depends_on:
+      - postgres-payments
+      - kafka
+    networks:
+      - orderly-network
+
+  catalog-service:
+    build:
+      context: ./apps/services/catalog-service
+    depends_on:
+      - postgres-catalog
+      - kafka
+    networks:
+      - orderly-network
+
+  web:
+    build:
+      context: ./apps/web
+    depends_on:
+      - api-gateway
+    networks:
+      - orderly-network
+
+networks:
+  orderly-network:
+    driver: bridge
+
+volumes:
+  postgres-auth-data:
+  postgres-orders-data:
+  postgres-payments-data:
+  postgres-catalog-data:

@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+package-lock.json
+
+# build outputs
+dist/
+build/
+.turbo/
+
+# logs
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# environment files
+.env
+.env.*
+
+# editor
+.idea/
+.vscode/
+*.swp
