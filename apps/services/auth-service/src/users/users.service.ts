@@ -1,9 +1,10 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
-import { User, UserStatus } from './entities/user.entity';
+import { Credentials } from './entities/credentials.value-object';
+import { User } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
@@ -21,12 +22,8 @@ export class UsersService {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = this.usersRepository.create({
-      email,
-      passwordHash,
-      name: name ?? null,
-      status: 'ACTIVE' satisfies UserStatus
-    });
+    const credentials = Credentials.fromHashed(passwordHash);
+    const user = User.create(email, credentials, name ?? null);
 
     return this.usersRepository.save(user);
   }

@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Credentials } from './credentials.value-object';
 
 export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETED';
 
@@ -10,8 +11,8 @@ export class User {
   @Column({ unique: true })
   email!: string;
 
-  @Column({ name: 'password_hash' })
-  passwordHash!: string;
+  @Column(() => Credentials, { prefix: false })
+  credentials!: Credentials;
 
   @Column({ nullable: true })
   name?: string | null;
@@ -24,4 +25,17 @@ export class User {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
+
+  static create(email: string, credentials: Credentials, name: string | null = null): User {
+    const user = new User();
+    user.email = email;
+    user.credentials = credentials;
+    user.name = name;
+    user.status = 'ACTIVE';
+    return user;
+  }
+
+  changeStatus(nextStatus: UserStatus): void {
+    this.status = nextStatus;
+  }
 }

@@ -7,7 +7,7 @@ import { User } from './entities/user.entity';
 import { UsersService } from './users.service';
 
 jest.mock('bcrypt', () => ({
-  hash: jest.fn()
+  hash: jest.fn(),
 }));
 
 describe('UsersService', () => {
@@ -15,12 +15,9 @@ describe('UsersService', () => {
   let repositoryMock: Record<string, jest.Mock>;
 
   beforeEach(async () => {
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
-
     repositoryMock = {
       findOne: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn()
+      save: jest.fn(),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -28,14 +25,12 @@ describe('UsersService', () => {
         UsersService,
         {
           provide: getRepositoryToken(User),
-          useValue: repositoryMock
-        }
-      ]
+          useValue: repositoryMock,
+        },
+      ],
     }).compile();
 
     service = moduleRef.get(UsersService);
-
-    jest.clearAllMocks();
   });
 
   afterEach(() => {
@@ -46,37 +41,34 @@ describe('UsersService', () => {
     const dto: CreateUserDto = {
       email: 'user@example.com',
       password: 'password123',
-      name: 'Test User'
+      name: 'Test User',
     };
 
     it('should create a new user when email is unique', async () => {
       repositoryMock.findOne.mockResolvedValue(null);
-      repositoryMock.create.mockReturnValue({
-        id: 'uuid',
-        ...dto,
-        passwordHash: 'hashed-password',
-        status: 'ACTIVE'
-      });
-      repositoryMock.save.mockImplementation(async (user) => user);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+      repositoryMock.save.mockImplementation(async (user) => Object.assign(user, { id: 'uuid' }));
 
       const result = await service.register(dto);
 
       expect(repositoryMock.findOne).toHaveBeenCalledWith({ where: { email: dto.email } });
       expect(bcrypt.hash).toHaveBeenCalledWith(dto.password, 12);
-      expect(repositoryMock.create).toHaveBeenCalledWith({
-        email: dto.email,
-        passwordHash: 'hashed-password',
-        name: dto.name,
-        status: 'ACTIVE'
-      });
-      expect(result).toEqual({ id: 'uuid', ...dto, passwordHash: 'hashed-password', status: 'ACTIVE' });
+      expect(repositoryMock.save).toHaveBeenCalled();
+
+      const savedUser = repositoryMock.save.mock.calls[0][0] as User;
+      expect(savedUser.email).toBe(dto.email);
+      expect(savedUser.name).toBe(dto.name);
+      expect(savedUser.credentials.hash).toBe('hashed-password');
+      expect(savedUser.status).toBe('ACTIVE');
+      expect(result).toMatchObject({ id: 'uuid', email: dto.email });
     });
 
     it('should throw ConflictException when email already exists', async () => {
       repositoryMock.findOne.mockResolvedValue({ id: 'existing' });
 
       await expect(service.register(dto)).rejects.toBeInstanceOf(ConflictException);
-      expect(repositoryMock.create).not.toHaveBeenCalled();
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+      expect(repositoryMock.save).not.toHaveBeenCalled();
     });
   });
 });
