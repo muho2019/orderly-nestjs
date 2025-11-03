@@ -47,6 +47,8 @@ services:
       NODE_ENV: production
       AUTH_SERVICE_URL: http://auth-service:3000/v1/auth/register
       AUTH_LOGIN_URL: http://auth-service:3000/v1/auth/login
+      AUTH_PROFILE_URL: http://auth-service:3000/v1/auth/me
+      AUTH_CHANGE_PASSWORD_URL: http://auth-service:3000/v1/auth/change-password
       PORT: 3000
     ports:
       - '3001:3000'

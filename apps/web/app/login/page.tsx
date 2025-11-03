@@ -50,7 +50,11 @@ export default function LoginPage(): JSX.Element {
       return;
     }
 
-    setFormState({ status: 'success', token: data.accessToken ?? '' });
+    const token = data.accessToken ?? '';
+    if (token) {
+      localStorage.setItem('orderly_token', token);
+    }
+    setFormState({ status: 'success', token });
     form.reset();
   }
 
@@ -107,9 +111,19 @@ export default function LoginPage(): JSX.Element {
       </form>
 
       {formState.status === 'success' && (
-        <div className="space-y-2 rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-          <p>로그인 성공! 발급된 토큰:</p>
-          <code className="block break-all text-xs text-emerald-100">{formState.token}</code>
+        <div className="space-y-3 rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+          <p>로그인 성공! 프로필을 수정하거나 비밀번호를 변경해 보세요.</p>
+          <p>
+            <Link href="/profile" className="text-emerald-300 underline-offset-4 hover:underline">
+              프로필 페이지로 이동
+            </Link>
+          </p>
+          {formState.token && (
+            <details className="text-xs text-emerald-100">
+              <summary className="cursor-pointer font-medium">발급된 토큰 보기</summary>
+              <code className="mt-2 block break-all">{formState.token}</code>
+            </details>
+          )}
         </div>
       )}
 
