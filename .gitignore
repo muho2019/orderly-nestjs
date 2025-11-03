@@ -15,6 +15,9 @@ yarn-error.log*
 # environment files
 .env
 .env.*
+**/.env
+**/.env.*
+!**/.env.example
 
 # editor
 .idea/

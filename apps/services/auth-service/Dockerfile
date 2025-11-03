@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY apps/services/auth-service/package.json apps/services/auth-service/package.json
+COPY apps/services/auth-service/.env apps/services/auth-service/.env
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared-kernel/package.json packages/shared-kernel/package.json
 COPY packages/testing/package.json packages/testing/package.json

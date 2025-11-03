@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY apps/web/package.json apps/web/package.json
+COPY apps/web/.env apps/web/.env
 COPY apps/services/auth-service/package.json apps/services/auth-service/package.json
 COPY packages/shared-kernel/package.json packages/shared-kernel/package.json
 COPY packages/testing/package.json packages/testing/package.json
@@ -29,7 +30,8 @@ COPY --from=build /app/apps/web/.next ./apps/web/.next
 COPY --from=build /app/apps/web/public ./apps/web/public
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/web/next.config.mjs ./apps/web/next.config.mjs
-COPY package.json package-lock.json ./ 
+COPY package.json package-lock.json ./
+COPY apps/web/.env ./apps/web/.env
 
 EXPOSE 3000
 
