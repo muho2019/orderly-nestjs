@@ -4,7 +4,9 @@
 
 **프로젝트명:** Orderly  
 **목표:** Nest.js 백엔드 아키텍처 학습과 이직 포트폴리오 구축  
-프론트엔드는 **Next.js + TypeScript**로 최소한의 기능만 제공하고, 백엔드에서는 **Nest.js + TypeScript** 기반의 MSA와 EDA 아키텍처 실습에 집중한다.
+프론트엔드는 **Next.js + TypeScript**로 최소한의 기능만 제공하고, 백엔드에서는 **Nest.js + TypeScript** 기반의 MSA와 EDA 아키텍처 실습에 집중한다.  
+설계 전반은 **DDD(Domain Driven Design)** 원칙을 적용해 바운디드 컨텍스트 단위로 기능을 확장한다.
+설계 전반은 **DDD(Domain Driven Design)** 원칙을 따르며 도메인/바운디드 컨텍스트 단위로 기능을 확장한다.
 
 ---
 
