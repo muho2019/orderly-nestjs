@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -127,6 +127,87 @@ describe('UsersService', () => {
 
       await expect(service.login(loginDto)).rejects.toBeInstanceOf(UnauthorizedException);
       expect(jwtServiceMock.sign).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findById', () => {
+    it('returns user when found', async () => {
+      const user = User.create('user@example.com', Credentials.fromHashed('hash'), 'Tester');
+      (user as unknown as { id: string }).id = 'user-id';
+      repositoryMock.findOne.mockResolvedValue(user);
+
+      const result = await service.findById('user-id');
+
+      expect(repositoryMock.findOne).toHaveBeenCalledWith({ where: { id: 'user-id' } });
+      expect(result).toBe(user);
+    });
+
+    it('throws NotFoundException when user missing', async () => {
+      repositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(service.findById('missing')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('updates name when provided', async () => {
+      const user = User.create('user@example.com', Credentials.fromHashed('hash'), 'Old');
+      (user as unknown as { id: string }).id = 'user-id';
+      repositoryMock.findOne.mockResolvedValue(user);
+      repositoryMock.save.mockImplementation(async (value) => value);
+
+      const result = await service.updateProfile('user-id', { name: '  New Name  ' });
+
+      expect(repositoryMock.save).toHaveBeenCalled();
+      expect(result.name).toBe('New Name');
+    });
+
+    it('sets name to null when blank string', async () => {
+      const user = User.create('user@example.com', Credentials.fromHashed('hash'), 'Old');
+      (user as unknown as { id: string }).id = 'user-id';
+      repositoryMock.findOne.mockResolvedValue(user);
+      repositoryMock.save.mockImplementation(async (value) => value);
+
+      const result = await service.updateProfile('user-id', { name: '   ' });
+
+      expect(result.name).toBeNull();
+    });
+  });
+
+  describe('changePassword', () => {
+    
+    it('updates password when current password matches', async () => {
+      const user = User.create('user@example.com', Credentials.fromHashed('hash'), 'Tester');
+      (user as unknown as { id: string }).id = 'user-id';
+      repositoryMock.findOne.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      repositoryMock.save.mockResolvedValue(undefined);
+
+      await service.changePassword('user-id', { currentPassword: 'old', newPassword: 'newpassword' });
+
+      expect(bcrypt.compare).toHaveBeenCalledWith('old', 'hash');
+      expect(bcrypt.hash).toHaveBeenCalledWith('newpassword', 12);
+      expect(repositoryMock.save).toHaveBeenCalled();
+    });
+
+    it('throws UnauthorizedException when current password invalid', async () => {
+      const user = User.create('user@example.com', Credentials.fromHashed('hash'), null);
+      (user as unknown as { id: string }).id = 'user-id';
+      repositoryMock.findOne.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.changePassword('user-id', { currentPassword: 'wrong', newPassword: 'newpassword' })
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('logout', () => {
+    it('resolves without error', async () => {
+      await expect(service.logout('user-id')).resolves.toBeUndefined();
     });
   });
 });
