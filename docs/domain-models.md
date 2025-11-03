@@ -1,154 +1,177 @@
 # Domain Models & Event Schemas
 
-Orderly는 주문·결제·카탈로그·인증 도메인을 독립 서비스로 구성하며, Kafka 이벤트를 통해 느슨하게 결합합니다. 본 문서는 도메인 핵심 엔티티, 관계, 상태, 그리고 공유 이벤트 스키마 초안을 정의합니다.
+Orderly는 주문·결제·카탈로그·인증 도메인을 독립 서비스로 구성하며, Kafka 이벤트를 통해 느슨하게 결합합니다. 각 도메인은 DDD의 바운디드 컨텍스트로 정의되고, 애그리게잇 루트·값 객체(Value Object)·도메인 서비스와 협력 규칙을 명확히 구분합니다. 본 문서의 목적은 도메인 경계와 이벤트 계약을 명시해 구현·테스트 시 일관성을 유지하는 것입니다.
 
 ---
 
-## 1. Auth Domain
+## 1. Auth Context
 
-### 핵심 엔티티
-- **User**
-  - `id`: UUID
-  - `email`, `passwordHash`, `status`
-  - `createdAt`, `updatedAt`
+### Aggregate & Value Objects
+- **User (Aggregate Root)**  
+  필드: `userId`, `email`, `credentials`, `status`, `name`, `createdAt`, `updatedAt`  
+  - `credentials`는 `Credentials` 값 객체로 구성(`passwordHash`, `salt` 등)
+  - 이메일은 불변 식별자이며 중복 허용 안 됨
+- **ContactInfo (Value Object, 향후)** – 연락처, 알림 채널
 
-### 상태/규칙
-- `status`: `ACTIVE`, `SUSPENDED`, `DELETED`
-- 이메일 중복 방지, 비밀번호 해싱(`bcrypt`)
+### Domain Services / Policies
+- `UserDomainService.register(command)`  
+  - 이메일 중복 검증 → 비밀번호 해싱 → User 애그리게잇 생성 → `auth.user.registered` 발행
+- `UserDomainService.changeStatus(user, nextStatus)`  
+  - 상태 전이 규칙: `ACTIVE ↔ SUSPENDED`, `DELETED`는 종단 상태
+  - 이벤트 `auth.user.suspended`, `auth.user.deleted` 발행
 
-### 이벤트
-| 이벤트 키 | 설명 | 페이로드 |
-| --------- | ---- | -------- |
-| `auth.user.registered` | 신규 회원 가입 | `{ userId, email, occurredAt }`
-| `auth.user.suspended` | 계정 정지 | `{ userId, reason, occurredAt }`
-
----
-
-## 2. Orders Domain
-
-### 핵심 엔티티
-- **Order**
-  - `id`: UUID
-  - `userId`: FK → Auth.User
-  - `items`: 배열 (productId, quantity, price)
-  - `totalAmount`, `currency`
-  - `status`: `CREATED`, `CONFIRMED`, `FULFILLED`, `CANCELLED`
-  - `paymentId`: 결제 참조 ID
-  - `createdAt`, `updatedAt`
-- **OrderItem** (읽기 모델, CQRS)
-  - 주문 목록/상세 조회용 테이블/뷰
-
-### 상태 전이
-```
-CREATED -> CONFIRMED -> FULFILLED
-         \
-          \-> CANCELLED
-```
-- 결제 실패, 고객 취소 등으로 `CANCELLED`
-
-### 이벤트
-| 이벤트 키 | 설명 | 페이로드 |
-| --------- | ---- | -------- |
-| `orders.order.created` | 주문 생성 | `{ orderId, userId, amount, status, occurredAt }`
-| `orders.order.statusChanged` | 상태 변경 | `{ orderId, prevStatus, nextStatus, causationId, occurredAt }`
+### Events & Consumers
+| 이벤트 키 | 의미 | 주요 구독 컨텍스트 |
+| --------- | ---- | ----------------- |
+| `auth.user.registered` | User 애그리게잇 생성 | Orders (고객 식별), Payments (빌링), Notifications |
+| `auth.user.suspended` | 사용자 활동 제한 | Orders (주문 차단), Analytics |
 
 ---
 
-## 3. Payments Domain (Toss Payments)
+## 2. Orders Context
 
-### 핵심 엔티티
-- **Payment**
-  - `id`: UUID (내부)
-  - `orderId`: FK → Orders.Order
-  - `provider`: `TOSS`
-  - `providerPaymentKey`
-  - `amount`, `currency`
-  - `status`: `PENDING`, `APPROVED`, `FAILED`, `CANCELLED`
-  - `approvedAt`, `failedAt`
+### Aggregate & Value Objects
+- **Order (Aggregate Root)**  
+  필드: `orderId`, `userId`, `status`, `money`, `lines`, `paymentId`, `createdAt`, `updatedAt`
+  - **OrderLine (Value Object)**: `productId`, `quantity`, `unitPrice`, `lineAmount`
+  - **Money (Value Object)**: `amount`, `currency` (모든 금액은 이 객체로 표현)
+  - **DeliveryInfo (Value Object, 향후)**: 배송지, 연락처
+- **OrderReadModel (Projection)** – CQRS 읽기 테이블/뷰. 애그리게잇이 아님.
 
-### 상태 전이
+### Domain Services / Policies
+- `OrderDomainService.placeOrder(command)`  
+  - Catalog/Inventory 검증 → 총액 계산 → idempotency 키 검증 → Order 애그리게잇 생성
+- `OrderAggregate.confirm(paymentEvent)`  
+  - 결제 성공 이벤트 수신 시 `CONFIRMED` 전이
+- `OrderAggregate.cancel(reason)`  
+  - 고객 취소, 결제 실패, 관리자 조치 등 정책 분기
+
+### State Diagram
 ```
-PENDING -> APPROVED -> (완료)
-   |          |
-   |          -> CANCELLED (사후 취소)
-   -> FAILED
+CREATED --(결제 성공)--> CONFIRMED --(배송 완료)--> FULFILLED
+   |                         |
+   |                         +--(관리자/시스템)--> CANCELLED
+   +--(결제 실패/고객 취소)--> CANCELLED
 ```
 
-### 이벤트
-| 이벤트 키 | 설명 | 페이로드 |
-| --------- | ---- | -------- |
-| `payments.payment.requested` | 결제 승인 요청 | `{ paymentId, orderId, amount, occurredAt }`
-| `payments.payment.succeeded` | 결제 성공 | `{ paymentId, orderId, amount, providerPaymentKey, occurredAt }`
-| `payments.payment.failed` | 결제 실패 | `{ paymentId, orderId, reason, occurredAt }`
-| `payments.payment.cancelled` | 결제 취소/환불 | `{ paymentId, orderId, reason, occurredAt }`
+### Events & Consumers
+| 이벤트 키 | 의미 | 주요 구독 컨텍스트 |
+| --------- | ---- | ----------------- |
+| `orders.order.created` | Order 애그리게잇 생성 | Payments, Catalog, Web |
+| `orders.order.statusChanged` | 상태 전이(이전/다음 상태 포함) | Payments(환불), Web UI, Analytics |
 
 ---
 
-## 4. Catalog Domain
+## 3. Payments Context (Toss)
 
-### 핵심 엔티티
-- **Product**
-  - `id`: UUID
-  - `name`, `description`
-  - `price`, `currency`
-  - `stock`
-  - `status`: `ACTIVE`, `INACTIVE`
-  - `createdAt`, `updatedAt`
-- **Category** (향후)
+### Aggregate & Value Objects
+- **Payment (Aggregate Root)**  
+  필드: `paymentId`, `orderId`, `provider`, `status`, `money`, `providerPaymentKey`, `requestedAt`, `approvedAt`, `failedAt`
+  - `money`: `Money` 값 객체
+  - `result`: `PaymentResult` 값 객체 (응답 코드, 메시지, 승인번호)
+- **WebhookEvent (Domain Event Entity)** – Toss 웹훅 원본 보관용 (감사 추적)
 
-### 이벤트
-| 이벤트 키 | 설명 | 페이로드 |
-| --------- | ---- | -------- |
-| `catalog.product.created` | 상품 등록 | `{ productId, name, price, stock, occurredAt }`
-| `catalog.product.updated` | 상품 수정 | `{ productId, changes, occurredAt }`
-| `catalog.product.statusChanged` | 활성/비활성 변경 | `{ productId, prevStatus, nextStatus, occurredAt }`
+### Domain Services / Policies
+- `PaymentDomainService.requestPayment(orderAggregate)`  
+  - Toss API 호출, idempotency 키 사용, `payments.payment.requested` 발행
+- `PaymentDomainService.handleWebhook(event)`  
+  - 서명 검증 → Payment 애그리게잇 상태 전이 → 주문 컨텍스트에 이벤트 전달
+- 환불/취소 정책은 `PaymentAggregate.cancel(reason)`에서 수행하고 `payments.payment.cancelled` 발행
 
----
+### State Diagram
+```
+PENDING --(승인 성공)--> APPROVED
+   |                     |
+   |                     +--(환불)--> CANCELLED
+   +--(승인 실패)--> FAILED
+```
 
-## 5. Review Domain (MVP 3)
-
-### 핵심 엔티티
-- **Review**
-  - `id`: UUID
-  - `orderId`, `productId`, `userId`
-  - `rating`, `comment`
-  - `createdAt`
-
-### 이벤트
-| 이벤트 키 | 설명 | 페이로드 |
-| --------- | ---- | -------- |
-| `reviews.review.created` | 리뷰 작성 | `{ reviewId, orderId, productId, userId, rating, occurredAt }`
+### Events & Consumers
+| 이벤트 키 | 의미 | 주요 구독 컨텍스트 |
+| --------- | ---- | ----------------- |
+| `payments.payment.requested` | Toss 승인 요청 시작 | Orders(주문 상태 잠금), Notifications |
+| `payments.payment.succeeded` | 결제 승인 완료 | Orders(확정), Web, Analytics |
+| `payments.payment.failed` | 결제 실패/거절 | Orders(취소), Web |
+| `payments.payment.cancelled` | 환불/취소 처리 | Orders(상태 업데이트), Accounting |
 
 ---
 
-## 6. Shared Kernel & Schema Governance
+## 4. Catalog Context
 
-- 이벤트 스키마는 `packages/shared-kernel/events`에 JSON Schema 또는 TypeScript 인터페이스로 정의
-- 공통 필드: `correlationId`, `causationId`, `occurredAt`
-- 이벤트 명명 규칙: `<boundedContext>.<aggregate>.<eventName>`
-- 스키마 변경 시 semver 규칙을 따른 버전 관리(예: `orders.order.created.v2`)
+### Aggregate & Value Objects
+- **Product (Aggregate Root)**  
+  필드: `productId`, `name`, `description`, `pricing`, `inventory`, `status`, `createdAt`, `updatedAt`
+  - `pricing`: `Money`
+  - `inventory`: `Inventory` 값 객체 (`stock`, `reserved`, `available`)
+- **Category (Aggregate Root, 향후)** – 상품 계층 구조
+
+### Domain Services / Policies
+- `CatalogDomainService.createProduct(command)`  
+  - 중복 이름 검증, 초기 재고 설정, `catalog.product.created` 발행
+- `CatalogDomainService.adjustInventory(productId, delta)`  
+  - 주문 컨텍스트와 이벤트로 협력 (보류 수량, 확정 감소)
+- 가격/재고 변경은 감사 추적을 위한 도메인 이벤트와 함께 처리
+
+### Events & Consumers
+| 이벤트 키 | 의미 | 주요 구독 컨텍스트 |
+| --------- | ---- | ----------------- |
+| `catalog.product.created` | 상품 애그리게잇 생성 | Orders(주문 가능 상품), Web |
+| `catalog.product.updated` | 상품 정보 변경 | Web, Analytics |
+| `catalog.product.statusChanged` | 판매 가능 여부 변경 | Orders(주문 제한), Web |
 
 ---
 
-## 7. 관계 다이어그램 (요약)
+## 5. Review Context (MVP 3)
+
+### Aggregate & Value Objects
+- **Review (Aggregate Root)**  
+  필드: `reviewId`, `orderId`, `productId`, `userId`, `rating`, `comment`, `createdAt`
+  - `rating`: `Rating` 값 객체 (1~5 범위 검증)
+  - `comment`: `ReviewComment` 값 객체 (길이 제한, 금칙어 필터)
+
+### Domain Services / Policies
+- `ReviewDomainService.submitReview(command)`  
+  - 주문 완료 상태인지 확인, 동일 주문에 대한 중복 리뷰 방지
+- 향후 `ModerationPolicy`로 부적절한 리뷰 필터링 적용
+
+### Events & Consumers
+| 이벤트 키 | 의미 | 주요 구독 컨텍스트 |
+| --------- | ---- | ----------------- |
+| `reviews.review.created` | 리뷰 작성 | Catalog(평점 업데이트), Analytics, Notifications |
+
+---
+
+## 6. Cross-Cutting Patterns
+
+- **Shared Kernel**  
+  - 이벤트/DTO 스키마는 `packages/shared-kernel/events`에 정의하고, `packages/testing`에서 계약 테스트 제공
+  - 이벤트 명명 규칙: `<boundedContext>.<aggregate>.<eventName>`
+  - 공통 필드: `correlationId`, `causationId`, `occurredAt`
+- **Idempotency & Consistency**  
+  - Orders/Payments 컨텍스트는 idempotency 키(주문 번호, Toss paymentKey)를 활용
+  - Outbox 패턴은 추후 도입하여 이벤트 발행 일관성 보장
+
+---
+
+## 7. Relationship Overview
 
 ```
 User (Auth) 1----* Order (Orders)
 Order 1----1 Payment (Payments)
-Order 1----* OrderItem (Read Model)
-Product (Catalog) 1----* OrderItem (via productId)
+Order 1----* OrderLine (Value Object)
+Product (Catalog) 1----* OrderLine (via productId snapshot)
 Review (Reviews) *----1 Order / Product / User
 ```
 
-- 각 서비스는 자체 DB를 보유하며 FK는 논리적 관계로만 유지(실제 DB FK 사용 X)
-- 데이터 동기화는 이벤트 기반으로 처리
+- 실제 데이터베이스 FK는 컨텍스트 내에만 존재하며, 컨텍스트 간 연결은 이벤트로 유지
+- OrderLine은 서비스 호출 시점의 상품 스냅샷을 값 객체로 보관해 가격 변경에 영향받지 않도록 한다
 
 ---
 
-## 8. 다음 단계
+## 8. Next Steps
 
-1. `packages/shared-kernel`에 위 이벤트 스키마를 TypeScript 타입으로 정의
-2. 계약 테스트에서 각 이벤트 페이로드 유효성 검증 추가 (`@orderly/testing`)
-3. 상태 전이와 이벤트 발행을 서비스 코드에서 구현 시 참조하도록 가이드
+1. `packages/shared-kernel`에 이벤트/DTO 타입을 정의하고 버전 관리 전략 수립  
+2. `@orderly/testing`에서 이벤트 스키마 계약 테스트 헬퍼 구현 (`validateEvent(payload, schema)`)  
+3. 각 애그리게잇에 대해 idempotency, 도메인 서비스 구현 가이드를 추가 문서로 확장  
 
-이 문서는 MVP 진행에 따라 지속적으로 업데이트되며, 새로운 도메인 도입 시 동일한 패턴으로 확장합니다.
+컨텍스트별 설계는 MVP 진행 상황에 맞추어 지속적으로 업데이트하며, 새로운 도메인이 추가될 경우 동일한 구조로 문서를 보강합니다.
