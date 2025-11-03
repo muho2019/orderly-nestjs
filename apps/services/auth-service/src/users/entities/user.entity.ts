@@ -14,10 +14,10 @@ export class User {
   @Column(() => Credentials, { prefix: false })
   credentials!: Credentials;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   name?: string | null;
 
-  @Column({ default: 'ACTIVE' })
+  @Column({ type: 'varchar', length: 32, default: 'ACTIVE' })
   status!: UserStatus;
 
   @CreateDateColumn({ name: 'created_at' })
