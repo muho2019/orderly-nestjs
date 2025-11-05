@@ -12,6 +12,9 @@ import { OrdersService } from './orders.service';
 import { OrderEntity } from './order.entity';
 import { OrderLineEntity } from './order-line.entity';
 import { OrdersEventPublisher } from './orders-event.publisher';
+
+const ESPRESSO_ID = '0f0b9c0a-0d58-4a37-9882-5e39f68d3c0d';
+const LATTE_ID = '7c070b25-92f7-4e72-9db9-8a1ab3f8ea9a';
 import { ProductCatalogService } from './product-catalog.service';
 
 jest.mock('node:crypto', () => ({
@@ -68,17 +71,17 @@ describe('OrdersService', () => {
 
     catalogEntries = new Map([
       [
-        '0f0b9c0a-0d58-4a37-9882-5e39f68d3c0d',
+        ESPRESSO_ID,
         {
-          id: '0f0b9c0a-0d58-4a37-9882-5e39f68d3c0d',
+          id: ESPRESSO_ID,
           name: 'Espresso',
           price: MoneyValue.from(2500, 'KRW')
         }
       ],
       [
-        '7c070b25-92f7-4e72-9db9-8a1ab3f8ea9a',
+        LATTE_ID,
         {
-          id: '7c070b25-92f7-4e72-9db9-8a1ab3f8ea9a',
+          id: LATTE_ID,
           name: 'Cafe Latte',
           price: MoneyValue.from(4500, 'KRW')
         }
@@ -95,12 +98,12 @@ describe('OrdersService', () => {
   const createDto = (): CreateOrderDto => ({
     items: [
       {
-        productId: '0f0b9c0a-0d58-4a37-9882-5e39f68d3c0d',
+        productId: ESPRESSO_ID,
         quantity: 2,
         unitPrice: { amount: 2500, currency: 'KRW' }
       },
       {
-        productId: '7c070b25-92f7-4e72-9db9-8a1ab3f8ea9a',
+        productId: LATTE_ID,
         quantity: 1,
         unitPrice: { amount: 4500, currency: 'KRW' }
       }
@@ -124,7 +127,7 @@ describe('OrdersService', () => {
 
     const line1 = new OrderLineEntity();
     line1.id = 'line-1';
-    line1.productId = '0f0b9c0a-0d58-4a37-9882-5e39f68d3c0d';
+    line1.productId = ESPRESSO_ID;
     line1.quantity = 2;
     line1.unitPriceAmount = 2500;
     line1.unitPriceCurrency = 'KRW';
@@ -133,7 +136,7 @@ describe('OrdersService', () => {
 
     const line2 = new OrderLineEntity();
     line2.id = 'line-2';
-    line2.productId = '7c070b25-92f7-4e72-9db9-8a1ab3f8ea9a';
+    line2.productId = LATTE_ID;
     line2.quantity = 1;
     line2.unitPriceAmount = 4500;
     line2.unitPriceCurrency = 'KRW';
@@ -178,13 +181,13 @@ describe('OrdersService', () => {
       total: { amount: 9500, currency: 'KRW' },
       items: expect.arrayContaining([
         expect.objectContaining({
-          productId: 'coffee-espresso',
+          productId: ESPRESSO_ID,
           quantity: 2,
           unitPrice: { amount: 2500, currency: 'KRW' },
           lineTotal: { amount: 5000, currency: 'KRW' }
         }),
         expect.objectContaining({
-          productId: 'coffee-latte',
+          productId: LATTE_ID,
           quantity: 1,
           unitPrice: { amount: 4500, currency: 'KRW' },
           lineTotal: { amount: 4500, currency: 'KRW' }
@@ -220,7 +223,7 @@ describe('OrdersService', () => {
 
   it('throws when product does not exist in catalog', async () => {
     const dto = createDto();
-    catalogEntries.delete('coffee-latte');
+    catalogEntries.delete(LATTE_ID);
     repository.findOne.mockResolvedValue(null);
 
     await expect(service.createOrder('user-id', dto)).rejects.toBeInstanceOf(BadRequestException);
