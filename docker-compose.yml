@@ -37,21 +37,99 @@ services:
     ports:
       - '3000:3000'
 
+  postgres-orders:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orderly
+      POSTGRES_PASSWORD: orderly
+      POSTGRES_DB: orderly_orders
+    ports:
+      - '5434:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U orderly -d orderly_orders']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-orders-data:/var/lib/postgresql/data
+
+  orders-service:
+    build:
+      context: .
+      dockerfile: apps/services/orders-service/Dockerfile
+    depends_on:
+      postgres-orders:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres-orders
+      DB_PORT: 5432
+      DB_USER: orderly
+      DB_PASSWORD: orderly
+      DB_NAME: orderly_orders
+      TYPEORM_SYNC: 'true'
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: orders-service
+      ORDERS_CREATED_TOPIC: orders.order.created
+    ports:
+      - '3002:3000'
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - '2181:2181'
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    ports:
+      - '9092:9092'
+      - '9093:9093'
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - '9094:8080'
+
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
     depends_on:
       - auth-service
+      - orders-service
     environment:
       NODE_ENV: production
       AUTH_SERVICE_URL: http://auth-service:3000/v1/auth/register
       AUTH_LOGIN_URL: http://auth-service:3000/v1/auth/login
       AUTH_PROFILE_URL: http://auth-service:3000/v1/auth/me
       AUTH_CHANGE_PASSWORD_URL: http://auth-service:3000/v1/auth/change-password
+      ORDERS_SERVICE_BASE_URL: http://orders-service:3000/v1/orders
       PORT: 3000
     ports:
       - '3001:3000'
 
 volumes:
   postgres-auth-data:
+  postgres-orders-data:

@@ -41,6 +41,8 @@ Orderly는 주문·결제·카탈로그·인증 도메인을 독립 서비스로
 ### Domain Services / Policies
 - `OrderDomainService.placeOrder(command)`  
   - Catalog/Inventory 검증 → 총액 계산 → idempotency 키 검증 → Order 애그리게잇 생성
+  - `clientReference`를 사용자별 idempotency 키로 사용하며, 성공 시 `orders.order.created` 이벤트와 correlation/causation 메타데이터를 발행
+  - MVP 1에서는 catalog-service가 준비되기 전까지 in-memory Mock 카탈로그로 상품 존재/가격을 검증
 - `OrderAggregate.confirm(paymentEvent)`  
   - 결제 성공 이벤트 수신 시 `CONFIRMED` 전이
 - `OrderAggregate.cancel(reason)`  
