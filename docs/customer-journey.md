@@ -23,7 +23,7 @@ Orderly 프로젝트는 Nest.js 기반 MSA 학습 및 포트폴리오 구축을 
 - **목표:** 기본 인증과 주문 생성/조회 플로우를 안정적으로 제공
 - **주요 단계 & 접점**
   1. **가입/로그인** – `auth-service` (JWT 발급), `web` 최소 UI (폼)
-  2. **상품 탐색** – 초기에는 프론트엔드 Mock 데이터 또는 간단한 카탈로그 API로 대체
+  2. **상품 탐색** – `orders-service` 내 고정 Mock 카탈로그 목록으로 대체(향후 catalog-service로 교체)
   3. **주문 생성** – `orders-service` REST API, Kafka 이벤트(`orders.order.created`)
   4. **주문 상태 확인** – CQRS 읽기 모델, `web`에서 주문 내역 목록 및 상세 확인
 - **백엔드 요구사항**

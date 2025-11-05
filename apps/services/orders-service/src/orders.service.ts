@@ -1,0 +1,136 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'node:crypto';
+import { Repository } from 'typeorm';
+import {
+  CreateOrderDto,
+  EventMetadata,
+  MoneyValue,
+  OrderResponseDto,
+  OrderStatus
+} from '@orderly/shared-kernel';
+import { OrderEntity } from './order.entity';
+import { OrderLineEntity } from './order-line.entity';
+import { OrdersEventPublisher } from './orders-event.publisher';
+import { mapOrderEntityToEvent, mapOrderEntityToResponse } from './order.mapper';
+import { ProductCatalogService } from './product-catalog.service';
+
+interface CreateOrderOptions {
+  correlationId?: string;
+  causationId?: string;
+}
+
+@Injectable()
+export class OrdersService {
+  constructor(
+    @InjectRepository(OrderEntity)
+    private readonly ordersRepository: Repository<OrderEntity>,
+    private readonly eventPublisher: OrdersEventPublisher,
+    private readonly productCatalog: ProductCatalogService
+  ) {}
+
+  async createOrder(userId: string, dto: CreateOrderDto, options?: CreateOrderOptions): Promise<OrderEntity> {
+    if (!userId) {
+      throw new BadRequestException('Authenticated user id is required to create an order');
+    }
+
+    const trimmedClientReference =
+      dto.clientReference && dto.clientReference.trim().length > 0 ? dto.clientReference.trim() : null;
+    if (trimmedClientReference) {
+      const existing = await this.ordersRepository.findOne({
+        where: { userId, clientReference: trimmedClientReference },
+        relations: ['lines']
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+
+    const { lines, total } = this.buildOrderLines(dto);
+
+    const order = new OrderEntity();
+    order.userId = userId;
+    order.status = OrderStatus.Created;
+    order.totalAmount = total.amount;
+    order.currency = total.currency;
+    order.note = dto.note && dto.note.trim().length > 0 ? dto.note.trim() : null;
+    order.clientReference = trimmedClientReference;
+    order.paymentId = null;
+    order.lines = lines;
+
+    lines.forEach((line) => {
+      line.order = order;
+    });
+
+    const savedOrder = await this.ordersRepository.save(order);
+    const persistedOrder = await this.ordersRepository.findOneOrFail({
+      where: { id: savedOrder.id },
+      relations: ['lines']
+    });
+
+    const eventMetadata = this.buildEventMetadata(options?.correlationId, options?.causationId);
+    const event = mapOrderEntityToEvent(persistedOrder, eventMetadata);
+    await this.eventPublisher.publishOrderCreated(event);
+
+    return persistedOrder;
+  }
+
+  mapToResponse(order: OrderEntity): OrderResponseDto {
+    return mapOrderEntityToResponse(order);
+  }
+
+  private buildOrderLines(dto: CreateOrderDto): { lines: OrderLineEntity[]; total: MoneyValue } {
+    if (!dto.items.length) {
+      throw new BadRequestException('Order must contain at least one item');
+    }
+
+    let total: MoneyValue | undefined;
+
+    const lines = dto.items.map((item) => {
+      const product = this.productCatalog.findById(item.productId);
+      if (!product) {
+        throw new BadRequestException(`Unknown product: ${item.productId}`);
+      }
+
+      const catalogPrice = product.price;
+      const requestedPrice = MoneyValue.from(item.unitPrice.amount, item.unitPrice.currency);
+
+      if (!catalogPrice.equals(requestedPrice)) {
+        throw new BadRequestException(`Price mismatch for product: ${item.productId}`);
+      }
+
+      if (!total) {
+        total = MoneyValue.from(0, catalogPrice.currency);
+      } else if (catalogPrice.currency !== total.currency) {
+        throw new BadRequestException('All order items must use the same currency');
+      }
+
+      const lineTotal = catalogPrice.multiply(item.quantity);
+      total = total.add(lineTotal);
+
+      const line = new OrderLineEntity();
+      line.productId = item.productId;
+      line.quantity = item.quantity;
+      line.unitPriceAmount = catalogPrice.amount;
+      line.unitPriceCurrency = catalogPrice.currency;
+      line.lineTotalAmount = lineTotal.amount;
+      line.lineTotalCurrency = lineTotal.currency;
+
+      return line;
+    });
+
+    if (!total) {
+      throw new BadRequestException('Order must contain at least one item');
+    }
+
+    return { lines, total };
+  }
+
+  private buildEventMetadata(correlationId?: string, causationId?: string): EventMetadata {
+    return {
+      correlationId: correlationId ?? randomUUID(),
+      causationId,
+      occurredAt: new Date().toISOString()
+    };
+  }
+}

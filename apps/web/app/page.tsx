@@ -5,7 +5,8 @@ export default function HomePage(): JSX.Element {
     <section className="flex flex-col gap-6">
       <h2 className="text-2xl font-semibold">시작하기</h2>
       <p className="leading-relaxed text-slate-300">
-        Orderly는 백엔드 학습을 위해 설계된 프로젝트입니다. 아래 버튼을 눌러 회원 등록 플로우를 체험해 보세요.
+        Orderly는 백엔드 학습을 위해 설계된 프로젝트입니다. 아래 버튼을 눌러 회원 등록 또는 주문 만들기 플로우를 체험해
+        보세요.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link
@@ -19,6 +20,12 @@ export default function HomePage(): JSX.Element {
           className="inline-flex items-center gap-2 rounded-md border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/10"
         >
           로그인 화면
+        </Link>
+        <Link
+          href="/orders"
+          className="inline-flex items-center gap-2 rounded-md border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/10"
+        >
+          주문 만들기
         </Link>
       </div>
     </section>

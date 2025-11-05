@@ -27,6 +27,7 @@ Orderly의 서비스별 REST API 계약과 MVP 단계별 사용자 스토리를 
 | Method | Path | Description | Auth |
 | ------ | ---- | ----------- | ---- |
 | `POST` | `/v1/orders` | 주문 생성 | Bearer |
+| `GET` | `/v1/orders/products` | Mock 상품 목록 조회 (MVP 1) | Public |
 | `GET` | `/v1/orders` | 내 주문 목록 조회 (읽기 모델) | Bearer |
 | `GET` | `/v1/orders/:orderId` | 주문 상세 조회 | Bearer |
 | `PATCH` | `/v1/orders/:orderId/cancel` | 주문 취소 | Bearer |
@@ -37,6 +38,99 @@ Orderly의 서비스별 REST API 계약과 MVP 단계별 사용자 스토리를 
 - **AS A** 인증된 고객, **I WANT** 내 주문 목록과 각 상태를 확인하고 싶다.
 - **AS A** 인증된 고객, **I WANT** 배송 전에 주문을 취소하고 싶다.
 - **AS A** 운영자(관리자), **I WANT** 비정상 상태의 주문을 수동으로 업데이트하고 싶다.
+
+#### POST `/v1/orders` – 주문 생성
+
+- **Headers**
+  - `X-User-Id`: API Gateway가 JWT를 검증한 뒤 전달하는 사용자 ID
+  - 선택: `X-User-Email` (웹 클라이언트 식별용), `X-Correlation-Id`, `X-Causation-Id` (Kafka 메타데이터 전달)
+- **Request Body**
+
+```json
+{
+  "items": [
+    {
+      "productId": "c7d1f07c-1a7b-4c9b-8a06-3c3e8e0a3c1f",
+      "quantity": 2,
+      "unitPrice": {
+        "amount": 19900,
+        "currency": "KRW"
+      }
+    }
+  ],
+  "note": "Leave at the door",
+  "clientReference": "web-checkout-20240401"
+}
+```
+
+- **Response 201**
+
+```json
+{
+  "id": "c4a65f29-7ca8-4a6f-8c9d-5f7e4af23ecc",
+  "userId": "a2f3456e-829b-4f91-9d21-92da5dd45b32",
+  "status": "CREATED",
+  "total": {
+    "amount": 39800,
+    "currency": "KRW"
+  },
+  "items": [
+    {
+      "productId": "c7d1f07c-1a7b-4c9b-8a06-3c3e8e0a3c1f",
+      "quantity": 2,
+      "unitPrice": {
+        "amount": 19900,
+        "currency": "KRW"
+      },
+      "lineTotal": {
+        "amount": 39800,
+        "currency": "KRW"
+      }
+    }
+  ],
+  "note": "Leave at the door",
+  "clientReference": "web-checkout-20240401",
+  "createdAt": "2024-04-01T12:30:00.000Z",
+  "updatedAt": "2024-04-01T12:30:00.000Z"
+}
+```
+
+- **Emitted Event: `orders.order.created`**
+  - `payload.orderId`: 주문 ID (UUID)
+  - `payload.userId`: 사용자 ID (JWT `sub`)
+  - `payload.total`: `{ amount, currency }`
+  - `payload.items[]`: 주문 행(`productId`, `quantity`, `unitPrice`, `lineTotal`)
+  - `payload.note`, `payload.clientReference`: 선택 필드
+  - `metadata`: `correlationId`, `causationId`, `occurredAt`
+
+#### GET `/v1/orders/products` – Mock 상품 목록
+
+- **Response 200**
+
+```json
+[
+  {
+    "id": "0f0b9c0a-0d58-4a37-9882-5e39f68d3c0d",
+    "name": "Espresso",
+    "price": {
+      "amount": 2500,
+      "currency": "KRW"
+    }
+  },
+  {
+    "id": "7c070b25-92f7-4e72-9db9-8a1ab3f8ea9a",
+    "name": "Cafe Latte",
+    "price": {
+      "amount": 4500,
+      "currency": "KRW"
+    }
+  }
+]
+```
+
+- **비고**
+  - MVP 1에서는 Orders 서비스 내부의 in-memory 카탈로그가 응답한다.
+  - 이후 `catalog-service`가 활성화되면 해당 엔드포인트는 폐기하거나 카탈로그 서비스의 프록시로 전환한다.
 
 ---
 
