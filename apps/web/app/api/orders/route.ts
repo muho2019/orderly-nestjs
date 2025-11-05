@@ -2,8 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import type { JwtClaims } from '../../../src/utils/jwt';
 import { decodeJwt } from '../../../src/utils/jwt';
-
-const ORDERS_BASE_URL = process.env.ORDERS_SERVICE_BASE_URL ?? 'http://localhost:3000/v1/orders';
+import { buildOrdersServiceUrl } from './service-config';
 
 interface OrderItemInput {
   productId: string;
@@ -87,6 +86,53 @@ function extractUserFromToken(token: string): { sub: string; email?: string } {
   return { sub: sub.trim(), email };
 }
 
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
+    }
+
+    const token = authHeader.slice(7).trim();
+    if (!token) {
+      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
+    }
+
+    const user = extractUserFromToken(token);
+    const correlationId = randomUUID();
+
+    const upstreamResponse = await fetch(buildOrdersServiceUrl('/'), {
+      headers: {
+        'X-User-Id': user.sub,
+        ...(user.email ? { 'X-User-Email': user.email } : {}),
+        'X-Correlation-Id': correlationId,
+        Authorization: authHeader
+      },
+      cache: 'no-store'
+    });
+
+    const upstreamBody = await upstreamResponse
+      .json()
+      .catch(() => ({ message: '주문 목록을 불러오지 못했습니다.' }));
+
+    if (!upstreamResponse.ok) {
+      return NextResponse.json(
+        { message: upstreamBody?.message ?? '주문 목록을 가져올 수 없습니다.' },
+        { status: upstreamResponse.status }
+      );
+    }
+
+    return NextResponse.json(upstreamBody, { status: 200 });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : '주문 목록을 가져올 수 없습니다.';
+    return NextResponse.json(
+      { message },
+      { status: message === '로그인이 필요합니다.' ? 401 : 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const authHeader = request.headers.get('authorization');
@@ -105,7 +151,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const clientReference = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const correlationId = randomUUID();
 
-    const upstreamResponse = await fetch(ORDERS_BASE_URL, {
+    const upstreamResponse = await fetch(buildOrdersServiceUrl('/'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

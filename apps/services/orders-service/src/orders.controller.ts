@@ -1,9 +1,12 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseUUIDPipe,
   Post,
   Req,
   UseGuards
@@ -42,6 +45,21 @@ export class OrdersController {
       causationId: normalizedCausationId ?? undefined
     });
 
+    return this.ordersService.mapToResponse(order);
+  }
+
+  @Get()
+  async findOrders(@Req() request: AuthenticatedRequest): Promise<OrderResponseDto[]> {
+    const orders = await this.ordersService.findOrdersForUser(request.user.sub);
+    return this.ordersService.mapToResponses(orders);
+  }
+
+  @Get(':orderId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})')
+  async findOrderById(
+    @Req() request: AuthenticatedRequest,
+    @Param('orderId', new ParseUUIDPipe({ version: '4' })) orderId: string
+  ): Promise<OrderResponseDto> {
+    const order = await this.ordersService.findOrderByIdForUser(orderId, request.user.sub);
     return this.ordersService.mapToResponse(order);
   }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -35,6 +35,7 @@ describe('OrdersService', () => {
   beforeEach(async () => {
     repository = {
       findOne: jest.fn(),
+      find: jest.fn(),
       findOneOrFail: jest.fn(),
       save: jest.fn()
     } as unknown as jest.Mocked<Repository<OrderEntity>>;
@@ -197,6 +198,41 @@ describe('OrdersService', () => {
 
     expect(order.id).toBe('order-id');
     expect(order.totalAmount).toBe(9500);
+  });
+
+  it('fetches orders for a user ordered by most recent', async () => {
+    const persisted = buildPersistedOrder();
+    repository.find.mockResolvedValue([persisted]);
+
+    const orders = await service.findOrdersForUser('user-id');
+
+    expect(repository.find).toHaveBeenCalledWith({
+      where: { userId: 'user-id' },
+      order: { createdAt: 'DESC' },
+      relations: ['lines']
+    });
+    expect(orders).toEqual([persisted]);
+  });
+
+  it('fetches a single order for the given user', async () => {
+    const persisted = buildPersistedOrder();
+    repository.findOne.mockResolvedValue(persisted);
+
+    const order = await service.findOrderByIdForUser('order-id', 'user-id');
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { id: 'order-id', userId: 'user-id' },
+      relations: ['lines']
+    });
+    expect(order).toBe(persisted);
+  });
+
+  it('throws when the order does not exist for the user', async () => {
+    repository.findOne.mockResolvedValue(null);
+
+    await expect(service.findOrderByIdForUser('missing', 'user-id')).rejects.toBeInstanceOf(
+      NotFoundException
+    );
   });
 
   it('returns the existing order when client reference matches', async () => {
