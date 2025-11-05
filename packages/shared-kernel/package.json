@@ -2,10 +2,10 @@
   "name": "@orderly/shared-kernel",
   "version": "0.1.0",
   "private": false,
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "echo \"TODO: build shared-kernel\"",
+    "build": "tsc -p tsconfig.json",
     "lint": "echo \"TODO: lint shared-kernel\"",
     "test": "echo \"TODO: test shared-kernel\""
   },

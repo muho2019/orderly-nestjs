@@ -1,38 +1,29 @@
 import { randomUUID } from 'node:crypto';
-import { NextResponse } from 'next/server';
-import { buildOrdersServiceUrl } from '../orders/service-config';
+import { NextRequest, NextResponse } from 'next/server';
+import { buildGatewayUrl } from '../gateway';
 
-function buildAnonymousHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    'X-Correlation-Id': randomUUID()
-  };
+const PRODUCTS_GATEWAY_URL = buildGatewayUrl('/orders/products');
 
-  const anonymousUserId =
-    process.env.ORDERS_SERVICE_ANONYMOUS_USER_ID && process.env.ORDERS_SERVICE_ANONYMOUS_USER_ID.trim().length > 0
-      ? process.env.ORDERS_SERVICE_ANONYMOUS_USER_ID.trim()
-      : 'anonymous-web-user';
-
-  headers['X-User-Id'] = anonymousUserId;
-
-  const anonymousEmail =
-    process.env.ORDERS_SERVICE_ANONYMOUS_USER_EMAIL && process.env.ORDERS_SERVICE_ANONYMOUS_USER_EMAIL.trim().length > 0
-      ? process.env.ORDERS_SERVICE_ANONYMOUS_USER_EMAIL.trim()
-      : undefined;
-
-  if (anonymousEmail) {
-    headers['X-User-Email'] = anonymousEmail;
+function getOptionalAuthorization(request: NextRequest): string | undefined {
+  const header = request.headers.get('authorization');
+  if (!header || header.trim().length === 0) {
+    return undefined;
   }
 
-  return headers;
+  return header;
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const response = await fetch(buildOrdersServiceUrl('/products'), {
+    const authorization = getOptionalAuthorization(request);
+
+    const response = await fetch(PRODUCTS_GATEWAY_URL, {
       method: 'GET',
-      headers: buildAnonymousHeaders(),
+      headers: {
+        Accept: 'application/json',
+        'X-Correlation-Id': randomUUID(),
+        ...(authorization ? { Authorization: authorization } : {})
+      },
       cache: 'no-store'
     });
 

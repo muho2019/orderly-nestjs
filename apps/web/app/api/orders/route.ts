@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { buildOrdersServiceUrl, extractUserFromToken } from './service-config';
+import { buildGatewayUrl } from '../gateway';
+
+const ORDERS_GATEWAY_URL = buildGatewayUrl('/orders');
 
 interface OrderItemInput {
   productId: string;
@@ -67,27 +69,24 @@ function normalizeOrderInput(raw: unknown): OrderPayload {
   };
 }
 
+function getAuthorization(request: NextRequest): string {
+  const header = request.headers.get('authorization');
+  if (!header || !header.toLowerCase().startsWith('bearer ')) {
+    throw new Error('AUTH_REQUIRED');
+  }
+
+  return header;
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
-    }
-
-    const token = authHeader.slice(7).trim();
-    if (!token) {
-      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
-    }
-
-    const user = extractUserFromToken(token);
+    const authorization = getAuthorization(request);
     const correlationId = randomUUID();
 
-    const upstreamResponse = await fetch(buildOrdersServiceUrl('/'), {
+    const upstreamResponse = await fetch(ORDERS_GATEWAY_URL, {
       headers: {
-        'X-User-Id': user.sub,
-        ...(user.email ? { 'X-User-Email': user.email } : {}),
-        'X-Correlation-Id': correlationId,
-        Authorization: authHeader
+        Authorization: authorization,
+        'X-Correlation-Id': correlationId
       },
       cache: 'no-store'
     });
@@ -105,41 +104,32 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(upstreamBody, { status: 200 });
   } catch (error) {
+    if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
+    }
+
     const message =
       error instanceof Error ? error.message : '주문 목록을 가져올 수 없습니다.';
-    return NextResponse.json(
-      { message },
-      { status: message === '로그인이 필요합니다.' ? 401 : 500 }
-    );
+    return NextResponse.json({ message }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
-    }
-
-    const token = authHeader.slice(7).trim();
-    if (!token) {
-      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
-    }
-
-    const user = extractUserFromToken(token);
+    const authorization = getAuthorization(request);
     const payload = normalizeOrderInput(await request.json());
 
-    const clientReference = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const clientReference = `web-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
     const correlationId = randomUUID();
 
-    const upstreamResponse = await fetch(buildOrdersServiceUrl('/'), {
+    const upstreamResponse = await fetch(ORDERS_GATEWAY_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': user.sub,
-        ...(user.email ? { 'X-User-Email': user.email } : {}),
-        'X-Correlation-Id': correlationId,
-        Authorization: `Bearer ${token}`
+        Authorization: authorization,
+        'X-Correlation-Id': correlationId
       },
       body: JSON.stringify({
         items: payload.items,
@@ -161,6 +151,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(upstreamBody, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
+    }
+
     const message =
       error instanceof Error ? error.message : '주문을 생성할 수 없습니다.';
     const status = message === '잘못된 요청입니다.' ? 400 : 500;

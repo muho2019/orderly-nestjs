@@ -22,7 +22,8 @@
     "jsonwebtoken": "^9.0.2",
     "kafkajs": "^2.2.4",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "@orderly/shared-kernel": "*"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.2",
