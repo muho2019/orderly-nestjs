@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
@@ -77,6 +77,43 @@ export class OrdersService {
 
   mapToResponse(order: OrderEntity): OrderResponseDto {
     return mapOrderEntityToResponse(order);
+  }
+
+  mapToResponses(orders: OrderEntity[]): OrderResponseDto[] {
+    return orders.map((order) => this.mapToResponse(order));
+  }
+
+  async findOrdersForUser(userId: string): Promise<OrderEntity[]> {
+    if (!userId || userId.trim().length === 0) {
+      throw new BadRequestException('Authenticated user id is required to fetch orders');
+    }
+
+    return this.ordersRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      relations: ['lines']
+    });
+  }
+
+  async findOrderByIdForUser(orderId: string, userId: string): Promise<OrderEntity> {
+    if (!userId || userId.trim().length === 0) {
+      throw new BadRequestException('Authenticated user id is required to fetch an order');
+    }
+
+    if (!orderId || orderId.trim().length === 0) {
+      throw new BadRequestException('Order id is required');
+    }
+
+    const order = await this.ordersRepository.findOne({
+      where: { id: orderId, userId },
+      relations: ['lines']
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return order;
   }
 
   private buildOrderLines(dto: CreateOrderDto): { lines: OrderLineEntity[]; total: MoneyValue } {
