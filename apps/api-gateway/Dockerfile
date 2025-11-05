@@ -29,7 +29,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/apps/api-gateway/dist ./apps/api-gateway/dist
 COPY apps/api-gateway/package.json ./apps/api-gateway/package.json
 COPY apps/api-gateway/.env.example ./apps/api-gateway/.env.example
-COPY packages/shared-kernel ./packages/shared-kernel
+COPY --from=build /app/packages/shared-kernel/package.json ./packages/shared-kernel/package.json
+COPY --from=build /app/packages/shared-kernel/dist ./packages/shared-kernel/dist
 COPY packages/testing ./packages/testing
 
 EXPOSE 4000
