@@ -266,7 +266,16 @@ export default function OrdersPage(): JSX.Element {
     async function loadProducts(): Promise<void> {
       setFetchState({ status: 'loading' });
       try {
-        const response = await fetch('/api/products', { cache: 'no-store' });
+        const token = typeof window !== 'undefined' ? localStorage.getItem('orderly_token') : null;
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch('/api/products', {
+          cache: 'no-store',
+          headers
+        });
         const data = await response
           .json()
           .catch(() => ({ message: '상품 정보를 불러오지 못했습니다.' }));

@@ -1,8 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { buildOrdersServiceUrl, extractUserFromToken } from '../../service-config';
+import { buildGatewayUrl } from '../../../gateway';
 
 type CancelRouteContext = { params: Promise<{ orderId: string }> };
+
+function getAuthorization(request: NextRequest): string {
+  const header = request.headers.get('authorization');
+  if (!header || !header.toLowerCase().startsWith('bearer ')) {
+    throw new Error('AUTH_REQUIRED');
+  }
+
+  return header;
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -14,17 +23,7 @@ export async function PATCH(
       return NextResponse.json({ message: '유효한 주문 ID가 필요합니다.' }, { status: 400 });
     }
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
-    }
-
-    const token = authHeader.slice(7).trim();
-    if (!token) {
-      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
-    }
-
-    const user = extractUserFromToken(token);
+    const authorization = getAuthorization(request);
 
     let reason: string | undefined;
     try {
@@ -41,14 +40,12 @@ export async function PATCH(
 
     const correlationId = randomUUID();
 
-    const upstreamResponse = await fetch(buildOrdersServiceUrl(`/${orderId}/cancel`), {
+    const upstreamResponse = await fetch(buildGatewayUrl(`/orders/${orderId}/cancel`), {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': user.sub,
-        ...(user.email ? { 'X-User-Email': user.email } : {}),
-        'X-Correlation-Id': correlationId,
-        Authorization: authHeader
+        Authorization: authorization,
+        'X-Correlation-Id': correlationId
       },
       body: JSON.stringify(reason ? { reason } : {})
     });
@@ -66,10 +63,13 @@ export async function PATCH(
 
     return NextResponse.json(upstreamBody, { status: 200 });
   } catch (error) {
+    if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+      return NextResponse.json({ message: '로그인이 필요합니다.' }, { status: 401 });
+    }
+
     const message =
       error instanceof Error ? error.message : '주문을 취소할 수 없습니다.';
-    const status =
-      message === '로그인이 필요합니다.' ? 401 : message.includes('주문 ID') ? 400 : 500;
+    const status = message.includes('주문 ID') ? 400 : 500;
     return NextResponse.json({ message }, { status });
   }
 }

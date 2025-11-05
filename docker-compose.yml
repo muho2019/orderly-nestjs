@@ -93,6 +93,10 @@ services:
       AUTH_SERVICE_TIMEOUT: 5000
       AUTH_JWT_SECRET: orderly-dev-secret
       CORRELATION_HEADER: x-correlation-id
+      ORDERS_SERVICE_BASE_URL: http://orders-service:3000/v1/orders
+      ORDERS_SERVICE_TIMEOUT: 5000
+      ORDERS_SERVICE_ANONYMOUS_USER_ID: anonymous-web-user
+      ORDERS_SERVICE_ANONYMOUS_EMAIL:
     ports:
       - '4000:4000'
 

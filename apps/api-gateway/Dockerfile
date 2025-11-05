@@ -16,6 +16,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+RUN npm run build --workspace=@orderly/shared-kernel
 RUN npm run build --workspace=@orderly/api-gateway
 
 FROM node:20-alpine AS runner
@@ -28,6 +29,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/apps/api-gateway/dist ./apps/api-gateway/dist
 COPY apps/api-gateway/package.json ./apps/api-gateway/package.json
 COPY apps/api-gateway/.env.example ./apps/api-gateway/.env.example
+COPY packages/shared-kernel ./packages/shared-kernel
+COPY packages/testing ./packages/testing
 
 EXPOSE 4000
 

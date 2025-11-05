@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { AuthTokenService } from './services/auth-token.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { OrdersController } from './orders.controller';
+import { OrdersService } from './orders.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -12,14 +11,14 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const timeoutValue = configService.get<string>('AUTH_SERVICE_TIMEOUT');
+        const timeoutValue = configService.get<string>('ORDERS_SERVICE_TIMEOUT');
         const timeout =
           timeoutValue && !Number.isNaN(Number(timeoutValue)) ? Number(timeoutValue) : 5000;
 
         return {
           baseURL: configService.get<string>(
-            'AUTH_SERVICE_BASE_URL',
-            'http://localhost:3000/v1/auth'
+            'ORDERS_SERVICE_BASE_URL',
+            'http://localhost:3000/v1/orders'
           ),
           timeout,
           headers: {
@@ -27,10 +26,11 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
           }
         };
       }
-    })
+    }),
+    AuthModule
   ],
-  controllers: [AuthController],
-  providers: [AuthService, AuthTokenService, JwtAuthGuard],
-  exports: [AuthService, AuthTokenService, JwtAuthGuard]
+  controllers: [OrdersController],
+  providers: [OrdersService],
+  exports: [OrdersService]
 })
-export class AuthModule {}
+export class OrdersModule {}
