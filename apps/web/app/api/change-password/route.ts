@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildGatewayUrl } from '../gateway';
 
-const AUTH_CHANGE_PASSWORD_URL =
-  process.env.AUTH_CHANGE_PASSWORD_URL ?? 'http://localhost:3000/v1/auth/change-password';
+const AUTH_CHANGE_PASSWORD_URL = buildGatewayUrl('/auth/change-password');
 
 function ensureAuthorization(request: NextRequest): string {
   const header = request.headers.get('authorization');

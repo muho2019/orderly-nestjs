@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildGatewayUrl } from '../gateway';
 
-const AUTH_SERVICE_URL =
-  process.env.AUTH_SERVICE_URL ?? 'http://localhost:3000/v1/auth/register';
+const AUTH_SERVICE_URL = buildGatewayUrl('/auth/register');
 
 type RegisterPayload = {
   email: string;

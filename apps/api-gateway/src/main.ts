@@ -1,5 +1,29 @@
-// TODO: bootstrap API gateway.
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
 
-export function bootstrapApiGateway(): void {
-  // placeholder bootstrap logic
+export async function bootstrapApiGateway(): Promise<void> {
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true
+  });
+
+  app.enableCors();
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true
+    })
+  );
+
+  app.setGlobalPrefix('v1');
+
+  const port = process.env.PORT ?? 4000;
+  await app.listen(port);
+  Logger.log(`API Gateway is running on port ${port}`, 'Bootstrap');
 }
+
+bootstrapApiGateway().catch((error) => {
+  Logger.error('Failed to bootstrap API Gateway', error);
+  process.exit(1);
+});
