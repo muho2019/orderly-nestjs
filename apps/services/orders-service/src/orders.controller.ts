@@ -7,11 +7,12 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Req,
   UseGuards
 } from '@nestjs/common';
-import { CreateOrderDto, OrderResponseDto } from '@orderly/shared-kernel';
+import { CancelOrderDto, CreateOrderDto, OrderResponseDto } from '@orderly/shared-kernel';
 import type { Request } from 'express';
 import { ApiGatewayAuthGuard } from './api-gateway-auth.guard';
 import { OrdersService } from './orders.service';
@@ -60,6 +61,26 @@ export class OrdersController {
     @Param('orderId', new ParseUUIDPipe({ version: '4' })) orderId: string
   ): Promise<OrderResponseDto> {
     const order = await this.ordersService.findOrderByIdForUser(orderId, request.user.sub);
+    return this.ordersService.mapToResponse(order);
+  }
+
+  @Patch(':orderId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/cancel')
+  @HttpCode(HttpStatus.OK)
+  async cancelOrder(
+    @Req() request: AuthenticatedRequest,
+    @Param('orderId', new ParseUUIDPipe({ version: '4' })) orderId: string,
+    @Body() dto: CancelOrderDto,
+    @Headers('x-correlation-id') correlationId?: string | string[],
+    @Headers('x-causation-id') causationId?: string | string[]
+  ): Promise<OrderResponseDto> {
+    const normalizedCorrelationId = Array.isArray(correlationId) ? correlationId[0] : correlationId;
+    const normalizedCausationId = Array.isArray(causationId) ? causationId[0] : causationId;
+
+    const order = await this.ordersService.cancelOrder(orderId, request.user.sub, dto, {
+      correlationId: normalizedCorrelationId ?? undefined,
+      causationId: normalizedCausationId ?? undefined
+    });
+
     return this.ordersService.mapToResponse(order);
   }
 }

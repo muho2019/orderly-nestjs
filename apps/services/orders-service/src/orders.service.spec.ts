@@ -2,10 +2,12 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
+  CancelOrderDto,
   CreateOrderDto,
   MoneyValue,
   OrderStatus,
-  ORDERS_ORDER_CREATED_EVENT
+  ORDERS_ORDER_CREATED_EVENT,
+  ORDERS_ORDER_STATUS_CHANGED_EVENT
 } from '@orderly/shared-kernel';
 import { Repository } from 'typeorm';
 import { OrdersService } from './orders.service';
@@ -24,7 +26,7 @@ jest.mock('node:crypto', () => ({
 describe('OrdersService', () => {
   let service: OrdersService;
   let repository: jest.Mocked<Repository<OrderEntity>>;
-  let eventPublisher: { publishOrderCreated: jest.Mock };
+  let eventPublisher: { publishOrderCreated: jest.Mock; publishOrderStatusChanged: jest.Mock };
   let productCatalog: { findById: jest.Mock };
   let catalogEntries: Map<
     string,
@@ -41,7 +43,8 @@ describe('OrdersService', () => {
     } as unknown as jest.Mocked<Repository<OrderEntity>>;
 
     eventPublisher = {
-      publishOrderCreated: jest.fn().mockResolvedValue(undefined)
+      publishOrderCreated: jest.fn().mockResolvedValue(undefined),
+      publishOrderStatusChanged: jest.fn().mockResolvedValue(undefined)
     };
 
     productCatalog = {
@@ -169,6 +172,7 @@ describe('OrdersService', () => {
     });
 
     expect(eventPublisher.publishOrderCreated).toHaveBeenCalledTimes(1);
+    expect(eventPublisher.publishOrderStatusChanged).not.toHaveBeenCalled();
     const event = eventPublisher.publishOrderCreated.mock.calls[0][0];
     expect(event.name).toBe(ORDERS_ORDER_CREATED_EVENT);
     expect(event.metadata).toEqual({
@@ -244,6 +248,7 @@ describe('OrdersService', () => {
 
     expect(repository.save).not.toHaveBeenCalled();
     expect(eventPublisher.publishOrderCreated).not.toHaveBeenCalled();
+    expect(eventPublisher.publishOrderStatusChanged).not.toHaveBeenCalled();
     expect(order).toBe(existingOrder);
   });
 
@@ -255,6 +260,7 @@ describe('OrdersService', () => {
     await expect(service.createOrder('user-id', dto)).rejects.toBeInstanceOf(BadRequestException);
     expect(repository.save).not.toHaveBeenCalled();
     expect(eventPublisher.publishOrderCreated).not.toHaveBeenCalled();
+    expect(eventPublisher.publishOrderStatusChanged).not.toHaveBeenCalled();
   });
 
   it('throws when product does not exist in catalog', async () => {
@@ -265,6 +271,7 @@ describe('OrdersService', () => {
     await expect(service.createOrder('user-id', dto)).rejects.toBeInstanceOf(BadRequestException);
     expect(repository.save).not.toHaveBeenCalled();
     expect(eventPublisher.publishOrderCreated).not.toHaveBeenCalled();
+    expect(eventPublisher.publishOrderStatusChanged).not.toHaveBeenCalled();
   });
 
   it('throws when submitted unit price does not match catalog price', async () => {
@@ -275,5 +282,73 @@ describe('OrdersService', () => {
     await expect(service.createOrder('user-id', dto)).rejects.toBeInstanceOf(BadRequestException);
     expect(repository.save).not.toHaveBeenCalled();
     expect(eventPublisher.publishOrderCreated).not.toHaveBeenCalled();
+    expect(eventPublisher.publishOrderStatusChanged).not.toHaveBeenCalled();
+  });
+
+  it('cancels an order and publishes status changed event', async () => {
+    const existing = buildPersistedOrder();
+    repository.findOne.mockResolvedValue(existing);
+    const cancelledOrder = { ...existing, status: OrderStatus.Cancelled };
+    repository.save.mockResolvedValue(cancelledOrder);
+    repository.findOneOrFail.mockResolvedValue(cancelledOrder);
+
+    const dto = { reason: 'Changed my mind' } as CancelOrderDto;
+
+    const result = await service.cancelOrder('order-id', 'user-id', dto);
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { id: 'order-id', userId: 'user-id' },
+      relations: ['lines']
+    });
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ status: OrderStatus.Cancelled }));
+    expect(repository.findOneOrFail).toHaveBeenCalledWith({
+      where: { id: 'order-id' },
+      relations: ['lines']
+    });
+    expect(eventPublisher.publishOrderStatusChanged).toHaveBeenCalledTimes(1);
+    const statusEvent = eventPublisher.publishOrderStatusChanged.mock.calls[0][0];
+    expect(statusEvent.name).toBe(ORDERS_ORDER_STATUS_CHANGED_EVENT);
+    expect(statusEvent.payload).toMatchObject({
+      orderId: 'order-id',
+      userId: 'user-id',
+      previousStatus: OrderStatus.Created,
+      currentStatus: OrderStatus.Cancelled,
+      reason: 'Changed my mind'
+    });
+    expect(result.status).toBe(OrderStatus.Cancelled);
+  });
+
+  it('returns existing cancelled order without publishing event', async () => {
+    const cancelled = buildPersistedOrder();
+    cancelled.status = OrderStatus.Cancelled;
+    repository.findOne.mockResolvedValue(cancelled);
+
+    const result = await service.cancelOrder('order-id', 'user-id', {} as CancelOrderDto);
+
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(eventPublisher.publishOrderStatusChanged).not.toHaveBeenCalled();
+    expect(result.status).toBe(OrderStatus.Cancelled);
+  });
+
+  it('throws when trying to cancel a non-cancellable order', async () => {
+    const confirmed = buildPersistedOrder();
+    confirmed.status = OrderStatus.Confirmed;
+    repository.findOne.mockResolvedValue(confirmed);
+
+    await expect(
+      service.cancelOrder('order-id', 'user-id', { reason: 'Too late' } as CancelOrderDto)
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(eventPublisher.publishOrderStatusChanged).not.toHaveBeenCalled();
+  });
+
+  it('throws when cancelling an order that does not exist', async () => {
+    repository.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.cancelOrder('missing-id', 'user-id', {} as CancelOrderDto)
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(eventPublisher.publishOrderStatusChanged).not.toHaveBeenCalled();
   });
 });

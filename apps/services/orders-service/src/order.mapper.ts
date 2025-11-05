@@ -4,7 +4,10 @@ import {
   OrderCreatedEvent,
   OrderLineDto,
   OrderResponseDto,
-  ORDERS_ORDER_CREATED_EVENT
+  OrderStatus,
+  OrderStatusChangedEvent,
+  ORDERS_ORDER_CREATED_EVENT,
+  ORDERS_ORDER_STATUS_CHANGED_EVENT
 } from '@orderly/shared-kernel';
 import { OrderEntity } from './order.entity';
 import { OrderLineEntity } from './order-line.entity';
@@ -48,6 +51,26 @@ export function mapOrderEntityToEvent(order: OrderEntity, metadata: EventMetadat
       items: order.lines?.map(mapLine) ?? [],
       note: order.note ?? undefined,
       clientReference: order.clientReference ?? undefined
+    },
+    metadata
+  };
+}
+
+export function mapOrderStatusChangedEvent(
+  order: OrderEntity,
+  previousStatus: OrderStatus,
+  metadata: EventMetadata,
+  reason?: string
+): OrderStatusChangedEvent {
+  return {
+    name: ORDERS_ORDER_STATUS_CHANGED_EVENT,
+    version: 1,
+    payload: {
+      orderId: order.id,
+      userId: order.userId,
+      previousStatus,
+      currentStatus: order.status,
+      reason
     },
     metadata
   };

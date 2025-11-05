@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import {
   CreateOrderDto,
+  CancelOrderDto,
   EventMetadata,
   MoneyValue,
   OrderResponseDto,
@@ -12,10 +13,19 @@ import {
 import { OrderEntity } from './order.entity';
 import { OrderLineEntity } from './order-line.entity';
 import { OrdersEventPublisher } from './orders-event.publisher';
-import { mapOrderEntityToEvent, mapOrderEntityToResponse } from './order.mapper';
+import {
+  mapOrderEntityToEvent,
+  mapOrderEntityToResponse,
+  mapOrderStatusChangedEvent
+} from './order.mapper';
 import { ProductCatalogService } from './product-catalog.service';
 
 interface CreateOrderOptions {
+  correlationId?: string;
+  causationId?: string;
+}
+
+interface CancelOrderOptions {
   correlationId?: string;
   causationId?: string;
 }
@@ -73,6 +83,56 @@ export class OrdersService {
     await this.eventPublisher.publishOrderCreated(event);
 
     return persistedOrder;
+  }
+
+  async cancelOrder(
+    orderId: string,
+    userId: string,
+    dto: CancelOrderDto | undefined,
+    options?: CancelOrderOptions
+  ): Promise<OrderEntity> {
+    if (!userId || userId.trim().length === 0) {
+      throw new BadRequestException('Authenticated user id is required to cancel an order');
+    }
+
+    if (!orderId || orderId.trim().length === 0) {
+      throw new BadRequestException('Order id is required to cancel an order');
+    }
+
+    const order = await this.ordersRepository.findOne({
+      where: { id: orderId, userId },
+      relations: ['lines']
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status === OrderStatus.Cancelled) {
+      return order;
+    }
+
+    if (order.status !== OrderStatus.Created) {
+      throw new BadRequestException('Only orders in CREATED status can be cancelled');
+    }
+
+    const previousStatus = order.status;
+    order.status = OrderStatus.Cancelled;
+
+    await this.ordersRepository.save(order);
+
+    const persisted = await this.ordersRepository.findOneOrFail({
+      where: { id: order.id },
+      relations: ['lines']
+    });
+
+    const metadata = this.buildEventMetadata(options?.correlationId, options?.causationId);
+    const normalizedReason =
+      dto?.reason && dto.reason.trim().length > 0 ? dto.reason.trim() : undefined;
+    const event = mapOrderStatusChangedEvent(persisted, previousStatus, metadata, normalizedReason);
+    await this.eventPublisher.publishOrderStatusChanged(event);
+
+    return persisted;
   }
 
   mapToResponse(order: OrderEntity): OrderResponseDto {
