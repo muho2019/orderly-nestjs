@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import type { JwtClaims } from '../../../src/utils/jwt';
-import { decodeJwt } from '../../../src/utils/jwt';
-import { buildOrdersServiceUrl } from './service-config';
+import { buildOrdersServiceUrl, extractUserFromToken } from './service-config';
 
 interface OrderItemInput {
   productId: string;
@@ -67,23 +65,6 @@ function normalizeOrderInput(raw: unknown): OrderPayload {
     items: normalizedItems,
     note: typeof note === 'string' && note.trim().length > 0 ? note.trim() : undefined
   };
-}
-
-function extractUserFromToken(token: string): { sub: string; email?: string } {
-  let claims: JwtClaims;
-  try {
-    claims = decodeJwt(token);
-  } catch {
-    throw new Error('JWT 토큰을 해석할 수 없습니다.');
-  }
-
-  const sub = claims.sub;
-  if (typeof sub !== 'string' || sub.trim().length === 0) {
-    throw new Error('JWT에 사용자 ID가 포함되어 있지 않습니다.');
-  }
-
-  const email = typeof claims.email === 'string' ? claims.email : undefined;
-  return { sub: sub.trim(), email };
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

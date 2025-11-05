@@ -1,10 +1,16 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrderCreatedEvent, ORDERS_ORDER_CREATED_EVENT } from '@orderly/shared-kernel';
+import {
+  OrderCreatedEvent,
+  OrderStatusChangedEvent,
+  ORDERS_ORDER_CREATED_EVENT,
+  ORDERS_ORDER_STATUS_CHANGED_EVENT
+} from '@orderly/shared-kernel';
 import { Kafka, type Producer } from 'kafkajs';
 
 export abstract class OrdersEventPublisher {
   abstract publishOrderCreated(event: OrderCreatedEvent): Promise<void>;
+  abstract publishOrderStatusChanged(event: OrderStatusChangedEvent): Promise<void>;
 }
 
 @Injectable()
@@ -58,6 +64,28 @@ export class KafkaOrdersEventPublisher
     });
 
     this.logger.debug(`Published ${event.name} for order ${event.payload.orderId}`);
+  }
+
+  async publishOrderStatusChanged(event: OrderStatusChangedEvent): Promise<void> {
+    const topic = this.configService.get<string>(
+      'ORDERS_STATUS_CHANGED_TOPIC',
+      ORDERS_ORDER_STATUS_CHANGED_EVENT
+    );
+    const producer = await this.getProducer();
+
+    await producer.send({
+      topic,
+      messages: [
+        {
+          key: `${event.payload.orderId}:${event.payload.currentStatus}`,
+          value: JSON.stringify(event)
+        }
+      ]
+    });
+
+    this.logger.debug(
+      `Published ${event.name} for order ${event.payload.orderId}: ${event.payload.previousStatus} -> ${event.payload.currentStatus}`
+    );
   }
 
   async onModuleDestroy(): Promise<void> {

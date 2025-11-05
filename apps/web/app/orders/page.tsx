@@ -49,6 +49,12 @@ type OrdersFetchState =
   | { status: 'error'; message: string }
   | { status: 'success'; orders: Order[] };
 
+type CancelState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; message?: string }
+  | { status: 'error'; message: string };
+
 function toDisplayAmount(money: Money): number {
   const fractionDigits = new Intl.NumberFormat('en', {
     style: 'currency',
@@ -194,7 +200,15 @@ export default function OrdersPage(): JSX.Element {
   const [note, setNote] = useState('');
   const [orderState, setOrderState] = useState<OrderState>({ status: 'idle' });
   const [ordersState, setOrdersState] = useState<OrdersFetchState>({ status: 'idle' });
+  const [cancelStates, setCancelStates] = useState<Record<string, CancelState>>({});
   const isMountedRef = useRef(true);
+
+  const updateCancelState = useCallback((orderId: string, nextState: CancelState) => {
+    setCancelStates((prev) => ({
+      ...prev,
+      [orderId]: nextState
+    }));
+  }, []);
 
   const loadOrders = useCallback(async () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('orderly_token') : null;
@@ -346,6 +360,76 @@ export default function OrdersPage(): JSX.Element {
       [productId]: Math.max(0, Math.min(99, Math.floor(value)))
     }));
   }
+
+  const handleCancel = useCallback(
+    async (orderId: string) => {
+      const token = localStorage.getItem('orderly_token');
+      if (!token) {
+        updateCancelState(orderId, {
+          status: 'error',
+          message: '주문을 취소하려면 먼저 로그인해야 합니다.'
+        });
+        return;
+      }
+
+      const confirmed = window.confirm('선택한 주문을 취소하시겠습니까?');
+      if (!confirmed) {
+        return;
+      }
+
+      updateCancelState(orderId, { status: 'loading' });
+
+      try {
+        const response = await fetch(`/api/orders/${orderId}/cancel`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({})
+        });
+
+        const data = await response
+          .json()
+          .catch(() => ({ message: '주문 취소에 실패했습니다.' }));
+
+        if (!response.ok) {
+          updateCancelState(orderId, {
+            status: 'error',
+            message: data?.message ?? '주문 취소 중 오류가 발생했습니다.'
+          });
+          return;
+        }
+
+        updateCancelState(orderId, {
+          status: 'success',
+          message: '주문이 취소되었습니다.'
+        });
+        await loadOrders();
+
+        if (isMountedRef.current) {
+          setTimeout(() => {
+            if (!isMountedRef.current) {
+              return;
+            }
+            setCancelStates((prev) => {
+              const current = prev[orderId];
+              if (!current || current.status !== 'success') {
+                return prev;
+              }
+              const { [orderId]: _removed, ...rest } = prev;
+              return rest;
+            });
+          }, 3000);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : '주문 취소 중 오류가 발생했습니다.';
+        updateCancelState(orderId, { status: 'error', message });
+      }
+    },
+    [isMountedRef, loadOrders, updateCancelState]
+  );
 
   async function handleSubmit(): Promise<void> {
     if (fetchState.status !== 'success') {
@@ -616,60 +700,93 @@ export default function OrdersPage(): JSX.Element {
           <p className="text-sm text-slate-400">아직 생성된 주문이 없습니다.</p>
         ) : (
           <ul className="space-y-4">
-            {ordersState.orders.map((order) => (
-              <li
-                key={order.id}
-                className="space-y-3 rounded-md border border-slate-800 bg-slate-900/40 p-4"
-              >
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-100">
-                      주문{' '}
-                      <span className="font-mono text-xs text-slate-400" title={order.id}>
-                        {order.id}
-                      </span>
+            {ordersState.orders.map((order) => {
+              const cancelState = (cancelStates[order.id] ?? { status: 'idle' }) as CancelState;
+              const isCancelling = cancelState.status === 'loading';
+              const cancelMessage =
+                cancelState.status === 'error' || cancelState.status === 'success'
+                  ? cancelState.message
+                  : undefined;
+
+              return (
+                <li
+                  key={order.id}
+                  className="space-y-3 rounded-md border border-slate-800 bg-slate-900/40 p-4"
+                >
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-100">
+                        주문{' '}
+                        <span className="font-mono text-xs text-slate-400" title={order.id}>
+                          {order.id}
+                        </span>
+                      </p>
+                      <p className="text-xs text-slate-400">{formatDateTime(order.createdAt)}</p>
+                    </div>
+                    <div className="text-right text-sm text-slate-300">
+                      <p className="font-medium text-emerald-300">{formatMoney(order.total)}</p>
+                      <p className="text-xs text-slate-400">{order.status}</p>
+                    </div>
+                  </div>
+
+                  {order.note && (
+                    <p className="text-xs text-slate-400">메모: {order.note}</p>
+                  )}
+
+                  {order.clientReference && (
+                    <p className="text-xs text-slate-500">
+                      클라이언트 참조:{' '}
+                      <span className="font-mono">{order.clientReference}</span>
                     </p>
-                    <p className="text-xs text-slate-400">{formatDateTime(order.createdAt)}</p>
+                  )}
+
+                  {order.status === 'CREATED' && (
+                    <div className="flex flex-col gap-2 rounded-md border border-slate-800 bg-slate-900/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs text-slate-400">
+                        주문이 확정되기 전까지 취소할 수 있습니다.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void handleCancel(order.id)}
+                        disabled={isCancelling || isRefreshingOrders}
+                        className="inline-flex items-center justify-center rounded-md border border-rose-500 px-3 py-1 text-xs font-medium text-rose-200 transition hover:bg-rose-500 hover:text-rose-950 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
+                      >
+                        {isCancelling ? '취소 중...' : '주문 취소'}
+                      </button>
+                    </div>
+                  )}
+
+                  {cancelState.status === 'error' && cancelMessage && (
+                    <p className="text-xs text-rose-400">{cancelMessage}</p>
+                  )}
+
+                  {cancelState.status === 'success' && cancelMessage && (
+                    <p className="text-xs text-emerald-300">{cancelMessage}</p>
+                  )}
+
+                  <div className="rounded-md border border-slate-800 bg-slate-900/60 p-3">
+                    <p className="text-xs font-medium text-slate-300">주문 상품</p>
+                    <ul className="mt-2 space-y-2 text-sm text-slate-200">
+                      {order.items.map((item, index) => {
+                        const productName =
+                          productLookup[item.productId]?.name ?? item.productId;
+                        return (
+                          <li
+                            key={`${order.id}-${item.productId}-${index}`}
+                            className="flex items-center justify-between gap-3"
+                          >
+                            <span className="text-slate-100">{productName}</span>
+                            <span className="text-xs text-slate-400">
+                              {item.quantity}개 · {formatMoney(item.lineTotal)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   </div>
-                  <div className="text-right text-sm text-slate-300">
-                    <p className="font-medium text-emerald-300">{formatMoney(order.total)}</p>
-                    <p className="text-xs text-slate-400">{order.status}</p>
-                  </div>
-                </div>
-
-                {order.note && (
-                  <p className="text-xs text-slate-400">메모: {order.note}</p>
-                )}
-
-                {order.clientReference && (
-                  <p className="text-xs text-slate-500">
-                    클라이언트 참조:{' '}
-                    <span className="font-mono">{order.clientReference}</span>
-                  </p>
-                )}
-
-                <div className="rounded-md border border-slate-800 bg-slate-900/60 p-3">
-                  <p className="text-xs font-medium text-slate-300">주문 상품</p>
-                  <ul className="mt-2 space-y-2 text-sm text-slate-200">
-                    {order.items.map((item, index) => {
-                      const productName =
-                        productLookup[item.productId]?.name ?? item.productId;
-                      return (
-                        <li
-                          key={`${order.id}-${item.productId}-${index}`}
-                          className="flex items-center justify-between gap-3"
-                        >
-                          <span className="text-slate-100">{productName}</span>
-                          <span className="text-xs text-slate-400">
-                            {item.quantity}개 · {formatMoney(item.lineTotal)}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         ))}
 
