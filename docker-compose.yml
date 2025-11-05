@@ -73,8 +73,28 @@ services:
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID: orders-service
       ORDERS_CREATED_TOPIC: orders.order.created
+      ORDERS_STATUS_CHANGED_TOPIC: orders.order.statusChanged
     ports:
       - '3002:3000'
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    depends_on:
+      auth-service:
+        condition: service_started
+      orders-service:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      AUTH_SERVICE_BASE_URL: http://auth-service:3000/v1/auth
+      AUTH_SERVICE_TIMEOUT: 5000
+      AUTH_JWT_SECRET: orderly-dev-secret
+      CORRELATION_HEADER: x-correlation-id
+    ports:
+      - '4000:4000'
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -117,15 +137,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     depends_on:
-      - auth-service
-      - orders-service
+      - api-gateway
     environment:
       NODE_ENV: production
-      AUTH_SERVICE_URL: http://auth-service:3000/v1/auth/register
-      AUTH_LOGIN_URL: http://auth-service:3000/v1/auth/login
-      AUTH_PROFILE_URL: http://auth-service:3000/v1/auth/me
-      AUTH_CHANGE_PASSWORD_URL: http://auth-service:3000/v1/auth/change-password
-      ORDERS_SERVICE_BASE_URL: http://orders-service:3000/v1/orders
+      API_GATEWAY_BASE_URL: http://api-gateway:4000/v1
       PORT: 3000
     ports:
       - '3001:3000'

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildGatewayUrl } from '../gateway';
 
-const AUTH_PROFILE_URL = process.env.AUTH_PROFILE_URL ?? 'http://localhost:3000/v1/auth/me';
+const AUTH_PROFILE_URL = buildGatewayUrl('/auth/me');
 
 function ensureAuthorization(request: NextRequest): string {
   const header = request.headers.get('authorization');
