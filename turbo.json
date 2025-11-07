@@ -4,7 +4,7 @@
     "package.json",
     "turbo.json"
   ],
-  "pipeline": {
+  "tasks": {
     "dev": {
       "cache": false,
       "persistent": true

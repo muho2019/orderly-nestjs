@@ -8,3 +8,8 @@ export * from './order-response.dto';
 export * from './order-created.event';
 export * from './order-status-changed.event';
 export * from './money.value-object';
+export * from './payment-status.enum';
+export * from './payment-requested.event';
+export * from './payment-succeeded.event';
+export * from './payment-failed.event';
+export * from './payment-cancelled.event';

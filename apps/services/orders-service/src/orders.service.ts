@@ -176,6 +176,38 @@ export class OrdersService {
     return order;
   }
 
+  async markOrderAsPaid(orderId: string, paymentId: string): Promise<void> {
+    const order = await this.ordersRepository.findOne({ where: { id: orderId } });
+    if (!order) {
+      return;
+    }
+
+    if (order.status === OrderStatus.Fulfilled) {
+      return;
+    }
+
+    if (order.status === OrderStatus.Created || order.status === OrderStatus.Confirmed) {
+      order.status = OrderStatus.Confirmed;
+      order.paymentId = paymentId;
+      await this.ordersRepository.save(order);
+    }
+  }
+
+  async markOrderPaymentFailed(orderId: string, reason?: string): Promise<void> {
+    const order = await this.ordersRepository.findOne({ where: { id: orderId } });
+    if (!order) {
+      return;
+    }
+
+    if (order.status === OrderStatus.Fulfilled || order.status === OrderStatus.Cancelled) {
+      return;
+    }
+
+    order.status = OrderStatus.Cancelled;
+    order.note = [order.note, reason?.trim()].filter(Boolean).join(' | ') || order.note;
+    await this.ordersRepository.save(order);
+  }
+
   private buildOrderLines(dto: CreateOrderDto): { lines: OrderLineEntity[]; total: MoneyValue } {
     if (!dto.items.length) {
       throw new BadRequestException('Order must contain at least one item');
