@@ -28,9 +28,9 @@ Orderly 프로젝트의 테스트 접근 방식과 품질 게이트 기준을 �
 - `orders.order.created`, `orders.order.statusChanged` 이벤트 스키마 검증
 
 ### Payments Service
-- Toss Payments 연동 모듈 단위 테스트 (axios mock)
+- Mock Payments Processor 연동 모듈 단위 테스트 (HTTP 클라이언트 모킹)
 - 웹훅 수신 시 주문 상태 업데이트 통합 테스트 (orders-service 연동 시 계약 테스트)
-- 결제 이벤트(`payments.*`) 스키마 검증
+- 결제 이벤트(`payments.*`) 스키마 검증 및 Toss 호환성 보장
 
 ### Catalog Service
 - 상품 CRUD 유즈케이스 단위 테스트
@@ -79,7 +79,7 @@ Codex Reviewer는 PR마다 위 항목을 확인합니다.
 
 - 테스트 DB는 서비스별 Postgres 컨테이너를 사용, 각 테스트마다 트랜잭션 롤백 또는 DB 리셋
 - Kafka는 테스트용 embedded broker(mock) 또는 docker-compose 기반 실브로커를 활용
-- Toss Payments 연동은 sandbox/mock 서버를 사용하여 외부 의존성 최소화
+- Payments 연동은 기본적으로 Mock Processor를 사용하며, 향후 Toss sandbox 연결 시에도 동일한 계약 테스트를 재사용
 
 ---
 

@@ -35,10 +35,10 @@ Orderly 프로젝트는 Nest.js 기반 MSA 학습 및 포트폴리오 구축을 
 
 ### MVP 2 – 결제 & 카탈로그 확장
 
-- **목표:** 실거래 플로우(Toss Payments)와 상품 관리 기능 도입
+- **목표:** 실거래 플로우에 앞서 Mock Payments 기반 결제 경험과 상품 관리 기능 도입 (실제 Toss 연동은 후속)
 - **주요 단계 & 접점**
   1. **상품 탐색 및 상세** – `catalog-service` REST API, 최소 UI에서 상품 목록/상세 제공
-  2. **결제 요청** – `payments-service`가 Toss Payments API와 통신하여 결제 승인 처리
+  2. **결제 요청** – `payments-service`가 Mock Payments Processor와 통신하여 결제 승인 처리 (향후 Toss API로 대체 계획)
   3. **결제 결과 확인** – Kafka 이벤트(`payments.payment.succeeded`)를 수신해 주문 상태 갱신
   4. **재고/상품 변경** – 관리자 API (향후 확장), 이벤트(`catalog.product.updated`)
 - **백엔드 요구사항**
@@ -72,7 +72,7 @@ Orderly 프로젝트는 Nest.js 기반 MSA 학습 및 포트폴리오 구축을 
 | ---------------- | ---------------------------------- | ------------- | --------- |
 | 가입/로그인      | `auth-service`, `web`               | JWT 토큰      | requirements, tech-guidelines |
 | 주문 생성        | `orders-service`, Kafka             | `orders.order.created` | architecture, shared-kernel |
-| 결제 처리        | `payments-service`, Toss Payments   | `payments.payment.succeeded` | architecture, requirements |
+| 결제 처리        | `payments-service`, Mock Payments Processor   | `payments.payment.succeeded` | architecture, requirements |
 | 주문 상태 조회   | `orders-service` 읽기 모델, `api-gateway` | `orders.order.statusChanged` | architecture |
 | 카탈로그 업데이트 | `catalog-service`, 관리자 UI         | `catalog.product.updated` | MVP 2 계획 |
 | 리뷰 등록        | 리뷰 서비스(향후), web              | `reviews.review.created` | MVP 3 계획 |

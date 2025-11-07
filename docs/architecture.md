@@ -16,7 +16,7 @@ Orderly는 **Nest.js 학습 및 포트폴리오 구축**을 목표로 하는 모
 | **api-gateway**      | Nest.js REST Gateway          | 인증, BFF 계층, 퍼블릭 API 집약                                  | HTTP              |
 | **auth-service**     | Nest.js, TypeORM, PostgreSQL  | 회원 가입/로그인, JWT 발급 및 검증, 인증 이벤트 발행            | REST + Kafka      |
 | **orders-service**   | Nest.js, CQRS, PostgreSQL     | 주문 생성·상태 전이, 주문 조회용 읽기 모델, 주문 이벤트 발행    | REST + Kafka      |
-| **payments-service** | Nest.js, Toss Payments API, PostgreSQL | 결제 승인/환불, 결제 이벤트 발행                         | REST + Kafka      |
+| **payments-service** | Nest.js, Mock Payments Adapter, PostgreSQL | 결제 승인/환불 시나리오 모킹, 결제 이벤트 발행 (실제 Toss 연동은 후속 단계) | REST + Kafka      |
 | **catalog-service*** | Nest.js, TypeORM, PostgreSQL  | 상품 등록/수정/조회, 카탈로그 이벤트 발행 (MVP 2에서 활성화)     | REST + Kafka      |
 | **web**              | Next.js 15, React 18          | 주문 생성·조회, 최소 인증 UI                                    | HTTP              |
 | **shared-kernel**    | TypeScript 패키지             | DTO, 이벤트 스키마, 유틸, 공통 타입                              | npm 패키지        |
@@ -69,7 +69,7 @@ orderly/
   - 인증/회원, 주문 생성 및 상태 전이, CQRS 기반 읽기 모델 노출
   - 이벤트: `orders.order.created`, `orders.order.statusChanged`
 - **MVP 2 – 결제 및 카탈로그 확장**
-  - 상품 카탈로그(`catalog-service`), Toss Payments 결제 연동, 주문-결제 이벤트 흐름 정립
+  - 상품 카탈로그(`catalog-service`), Mock Payments API 기반 결제 흐름, 주문-결제 이벤트 정립
   - 이벤트: `payments.payment.succeeded`, `catalog.product.updated`
 - **MVP 3 – 고객 경험 강화**
   - 리뷰/피드백, 관리자 기능, 로그·트레이싱 기반 관찰 가능성 추가

@@ -64,18 +64,18 @@ CREATED --(결제 성공)--> CONFIRMED --(배송 완료)--> FULFILLED
 
 ---
 
-## 3. Payments Context (Toss)
+## 3. Payments Context (Mock Payments)
 
 ### Aggregate & Value Objects
 - **Payment (Aggregate Root)**  
   필드: `paymentId`, `orderId`, `provider`, `status`, `money`, `providerPaymentKey`, `requestedAt`, `approvedAt`, `failedAt`
   - `money`: `Money` 값 객체
   - `result`: `PaymentResult` 값 객체 (응답 코드, 메시지, 승인번호)
-- **WebhookEvent (Domain Event Entity)** – Toss 웹훅 원본 보관용 (감사 추적)
+- **WebhookEvent (Domain Event Entity)** – Mock 결제 웹훅 원본 보관용 (향후 Toss 원본 저장으로 확장)
 
 ### Domain Services / Policies
 - `PaymentDomainService.requestPayment(orderAggregate)`  
-  - Toss API 호출, idempotency 키 사용, `payments.payment.requested` 발행
+  - Mock Processor API 호출, idempotency 키 사용, `payments.payment.requested` 발행 (실제 Toss 호출로 대체 가능하도록 인터페이스 분리)
 - `PaymentDomainService.handleWebhook(event)`  
   - 서명 검증 → Payment 애그리게잇 상태 전이 → 주문 컨텍스트에 이벤트 전달
 - 환불/취소 정책은 `PaymentAggregate.cancel(reason)`에서 수행하고 `payments.payment.cancelled` 발행
@@ -91,7 +91,7 @@ PENDING --(승인 성공)--> APPROVED
 ### Events & Consumers
 | 이벤트 키 | 의미 | 주요 구독 컨텍스트 |
 | --------- | ---- | ----------------- |
-| `payments.payment.requested` | Toss 승인 요청 시작 | Orders(주문 상태 잠금), Notifications |
+| `payments.payment.requested` | 결제 승인 요청 시작 (Mock Processor 호출 기준) | Orders(주문 상태 잠금), Notifications |
 | `payments.payment.succeeded` | 결제 승인 완료 | Orders(확정), Web, Analytics |
 | `payments.payment.failed` | 결제 실패/거절 | Orders(취소), Web |
 | `payments.payment.cancelled` | 환불/취소 처리 | Orders(상태 업데이트), Accounting |
@@ -150,7 +150,7 @@ PENDING --(승인 성공)--> APPROVED
   - 이벤트 명명 규칙: `<boundedContext>.<aggregate>.<eventName>`
   - 공통 필드: `correlationId`, `causationId`, `occurredAt`
 - **Idempotency & Consistency**  
-  - Orders/Payments 컨텍스트는 idempotency 키(주문 번호, Toss paymentKey)를 활용
+  - Orders/Payments 컨텍스트는 idempotency 키(주문 번호, mockPaymentKey)를 활용하며, 실제 Toss 키와 호환되도록 포맷을 맞춘다
   - Outbox 패턴은 추후 도입하여 이벤트 발행 일관성 보장
 
 ---

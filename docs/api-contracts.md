@@ -134,19 +134,20 @@ Orderly의 서비스별 REST API 계약과 MVP 단계별 사용자 스토리를 
 
 ---
 
-## 3. Payments Service (Toss Payments)
+## 3. Payments Service (Mock, Toss-ready)
 
 ### REST Endpoints
 | Method | Path | Description | Auth |
 | ------ | ---- | ----------- | ---- |
-| `POST` | `/v1/payments` | 결제 승인 요청 (Toss API 호출) | Bearer |
-| `POST` | `/v1/payments/webhook` | Toss 웹훅 수신 | Public (IP 제한) |
+| `POST` | `/v1/payments` | 결제 승인 요청 (내부 Mock Processor 호출) | Bearer |
+| `POST` | `/v1/payments/webhook` | Mock 결제 결과 웹훅 수신 | Public (IP 제한) |
 | `GET` | `/v1/payments/:paymentId` | 결제 상세 조회 | Bearer |
 | `POST` | `/v1/payments/:paymentId/cancel` | 결제 취소/환불 | Bearer |
 
 ### User Stories
-- **AS A** 주문 고객, **I WANT** Toss 결제 UX를 통해 안전하게 결제하고 싶다.
-- **AS A** 시스템, **I WANT** Toss 웹훅을 통해 결제 성공/실패를 실시간으로 수신하고 주문 상태를 갱신하고 싶다.
+- **AS A** 주문 고객, **I WANT** 실제 카드 정보를 입력하지 않고도 Mock 결제 흐름으로 주문을 검증하고 싶다.
+- **AS A** 시스템, **I WANT** Mock 웹훅을 통해 결제 성공/실패를 실시간으로 수신하고 주문 상태를 갱신하고 싶다.
+- _Note:_ 실제 Toss Payments 연동은 포트폴리오 후속 과제로 예약되어 있으며, 현재 Mock API는 Toss 스펙과 최대한 유사한 계약을 유지한다.
 - **AS A** 고객, **I WANT** 필요 시 결제를 취소하고 환불 상태를 확인하고 싶다.
 
 ---
@@ -204,8 +205,8 @@ Orderly의 서비스별 REST API 계약과 MVP 단계별 사용자 스토리를 
 | 1 | 고객으로서 상품을 선택해 주문을 생성하고 싶다. | Orders | Must |
 | 1 | 고객으로서 주문 상태를 확인하고 싶다. | Orders | Must |
 | 1 | 시스템으로서 주문 생성 시 Kafka 이벤트를 발행하고 싶다. | Orders | Must |
-| 2 | 고객으로서 Toss 결제로 주문을 결제하고 싶다. | Payments | Must |
-| 2 | 시스템으로서 Toss 웹훅을 수신해 주문 상태를 업데이트하고 싶다. | Payments + Orders | Must |
+| 2 | 고객으로서 Mock 결제 API로 주문을 결제하고 싶다. | Payments | Must |
+| 2 | 시스템으로서 Mock 결제 웹훅을 수신해 주문 상태를 업데이트하고 싶다. | Payments + Orders | Must |
 | 2 | 고객으로서 상품 목록과 상세 정보를 보고 싶다. | Catalog | Should |
 | 3 | 고객으로서 리뷰를 남기고 싶다. | Reviews | Should |
 | 3 | 관리자/운영자로서 주문/결제 지표를 확인하고 싶다. | Admin Dashboard | Should |
