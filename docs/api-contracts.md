@@ -166,6 +166,24 @@ Orderly의 서비스별 REST API 계약과 MVP 단계별 사용자 스토리를 
 ### User Stories
 - **AS A** 고객, **I WANT** 주문 전에 상품 정보(가격, 재고)를 확인하고 싶다.
 - **AS A** 관리자, **I WANT** 상품 정보를 등록/수정하여 최신 상태로 관리하고 싶다.
+- **Product Status**
+  - `DRAFT` → 초안, 고객 비노출
+  - `ACTIVE` → 판매 가능
+  - `INACTIVE` → 일시 중지
+  - `DISCONTINUED` → 판매 종료(주문 불가)
+
+### Sample Product Payload
+```json
+{
+  "id": "a3f4c2d1-9c78-4a0f-8ed6-b443e6c1ce01",
+  "name": "Ethiopia Yirgacheffe 200g",
+  "description": "플로럴 향이 돋보이는 싱글 오리진 원두",
+  "price": { "amount": 18000, "currency": "KRW" },
+  "status": "ACTIVE",
+  "sku": "BEAN-ETH-200",
+  "thumbnailUrl": "https://static.orderly.dev/catalog/beans/ethiopia.png"
+}
+```
 
 ---
 

@@ -102,9 +102,10 @@ PENDING --(승인 성공)--> APPROVED
 
 ### Aggregate & Value Objects
 - **Product (Aggregate Root)**  
-  필드: `productId`, `name`, `description`, `pricing`, `inventory`, `status`, `createdAt`, `updatedAt`
+  필드: `productId`, `name`, `description`, `pricing`, `inventory`, `status`, `sku`, `media`, `createdAt`, `updatedAt`
   - `pricing`: `Money`
   - `inventory`: `Inventory` 값 객체 (`stock`, `reserved`, `available`)
+  - `status`: `ProductStatus` (`DRAFT`, `ACTIVE`, `INACTIVE`, `DISCONTINUED`)
 - **Category (Aggregate Root, 향후)** – 상품 계층 구조
 
 ### Domain Services / Policies
