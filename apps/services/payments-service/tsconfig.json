@@ -1,0 +1,22 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "es2019",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./src",
+    "incremental": true,
+    "paths": {
+      "@orderly/shared-kernel": ["../../../../packages/shared-kernel/src"],
+      "@orderly/shared-kernel/*": ["../../../../packages/shared-kernel/src/*"]
+    }
+  },
+  "include": ["src/**/*", ".env"],
+  "exclude": ["node_modules", "dist"]
+}

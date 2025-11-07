@@ -77,6 +77,51 @@ services:
     ports:
       - '3002:3000'
 
+  postgres-payments:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orderly
+      POSTGRES_PASSWORD: orderly
+      POSTGRES_DB: orderly_payments
+    ports:
+      - '5435:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U orderly -d orderly_payments']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-payments-data:/var/lib/postgresql/data
+
+  payments-service:
+    build:
+      context: .
+      dockerfile: apps/services/payments-service/Dockerfile
+    depends_on:
+      postgres-payments:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres-payments
+      DB_PORT: 5432
+      DB_USER: orderly
+      DB_PASSWORD: orderly
+      DB_NAME: orderly_payments
+      TYPEORM_SYNC: 'true'
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: payments-service
+      PAYMENTS_REQUESTED_TOPIC: payments.payment.requested
+      PAYMENTS_SUCCEEDED_TOPIC: payments.payment.succeeded
+      PAYMENTS_FAILED_TOPIC: payments.payment.failed
+      PAYMENTS_CANCELLED_TOPIC: payments.payment.cancelled
+      MOCK_PAYMENTS_DECLINE_THRESHOLD: 500000
+    ports:
+      - '3003:3000'
+
   api-gateway:
     build:
       context: .
@@ -97,6 +142,8 @@ services:
       ORDERS_SERVICE_TIMEOUT: 5000
       ORDERS_SERVICE_ANONYMOUS_USER_ID: anonymous-web-user
       ORDERS_SERVICE_ANONYMOUS_EMAIL:
+      PAYMENTS_SERVICE_BASE_URL: http://payments-service:3000/v1/payments
+      PAYMENTS_SERVICE_TIMEOUT: 5000
     ports:
       - '4000:4000'
 
@@ -152,3 +199,4 @@ services:
 volumes:
   postgres-auth-data:
   postgres-orders-data:
+  postgres-payments-data:

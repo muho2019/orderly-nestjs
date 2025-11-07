@@ -55,6 +55,12 @@ type CancelState =
   | { status: 'success'; message?: string }
   | { status: 'error'; message: string };
 
+type PaymentState =
+  | { status: 'idle' }
+  | { status: 'processing' }
+  | { status: 'success'; message: string }
+  | { status: 'error'; message: string };
+
 function toDisplayAmount(money: Money): number {
   const fractionDigits = new Intl.NumberFormat('en', {
     style: 'currency',
@@ -201,7 +207,12 @@ export default function OrdersPage(): JSX.Element {
   const [orderState, setOrderState] = useState<OrderState>({ status: 'idle' });
   const [ordersState, setOrdersState] = useState<OrdersFetchState>({ status: 'idle' });
   const [cancelStates, setCancelStates] = useState<Record<string, CancelState>>({});
+  const [paymentState, setPaymentState] = useState<PaymentState>({ status: 'idle' });
   const isMountedRef = useRef(true);
+
+  function getToken(): string | null {
+    return typeof window !== 'undefined' ? localStorage.getItem('orderly_token') : null;
+  }
 
   const updateCancelState = useCallback((orderId: string, nextState: CancelState) => {
     setCancelStates((prev) => ({
@@ -440,6 +451,53 @@ export default function OrdersPage(): JSX.Element {
     [isMountedRef, loadOrders, updateCancelState]
   );
 
+  const requestPaymentForOrder = useCallback(
+    async (order: Order) => {
+      const token = getToken();
+      if (!token) {
+        setPaymentState({
+          status: 'error',
+          message: '결제를 진행하려면 로그인해야 합니다.'
+        });
+        return;
+      }
+
+      setPaymentState({ status: 'processing' });
+      try {
+        const response = await fetch('/api/payments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            orderId: order.id,
+            amount: order.total
+          })
+        });
+
+        const data = await response
+          .json()
+          .catch(() => ({ message: '결제 요청 처리 중 오류가 발생했습니다.' }));
+
+        if (!response.ok) {
+          throw new Error(data?.message ?? '결제에 실패했습니다.');
+        }
+
+        setPaymentState({
+          status: 'success',
+          message: `결제가 완료되었습니다. (결제 ID: ${data.id ?? '확인 중'})`
+        });
+        await loadOrders();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : '결제 요청에 실패했습니다.';
+        setPaymentState({ status: 'error', message });
+      }
+    },
+    [loadOrders]
+  );
+
   async function handleSubmit(): Promise<void> {
     if (fetchState.status !== 'success') {
       return;
@@ -460,6 +518,7 @@ export default function OrdersPage(): JSX.Element {
     }
 
     setOrderState({ status: 'submitting' });
+    setPaymentState({ status: 'idle' });
 
     const payload = {
       items: selectedItems.map((item) => ({
@@ -492,13 +551,25 @@ export default function OrdersPage(): JSX.Element {
         return;
       }
 
+      const orderId = data?.id ?? 'unknown-order';
+      const orderTotal =
+        typeof data === 'object' && data !== null && 'total' in data
+          ? (data.total as Money)
+          : totalMoney;
       setOrderState({
         status: 'success',
-        orderId: data?.id ?? 'unknown-order'
+        orderId
       });
       setQuantities(Object.fromEntries(fetchState.products.map((p) => [p.id, 0])));
       setNote('');
-      void loadOrders();
+      if (orderTotal) {
+        await requestPaymentForOrder({
+          id: orderId,
+          total: orderTotal
+        } as Order);
+      } else {
+        await loadOrders();
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : '주문 생성 중 오류가 발생했습니다.';
@@ -663,6 +734,24 @@ export default function OrdersPage(): JSX.Element {
       {orderState.status === 'error' && (
         <div className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
           {orderState.message}
+        </div>
+      )}
+
+      {paymentState.status === 'processing' && (
+        <div className="rounded-md border border-amber-500 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+          결제 요청을 처리하고 있습니다...
+        </div>
+      )}
+
+      {paymentState.status === 'success' && (
+        <div className="rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+          {paymentState.message}
+        </div>
+      )}
+
+      {paymentState.status === 'error' && (
+        <div className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+          {paymentState.message}
         </div>
       )}
 

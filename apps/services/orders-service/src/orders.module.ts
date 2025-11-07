@@ -8,6 +8,7 @@ import { OrdersService } from './orders.service';
 import { ApiGatewayAuthGuard } from './api-gateway-auth.guard';
 import { MockProductCatalogService, ProductCatalogService } from './product-catalog.service';
 import { ProductsController } from './products.controller';
+import { PaymentsEventsConsumer } from './payments-events.consumer';
 
 @Module({
   imports: [TypeOrmModule.forFeature([OrderEntity, OrderLineEntity])],
@@ -22,7 +23,8 @@ import { ProductsController } from './products.controller';
       provide: ProductCatalogService,
       useClass: MockProductCatalogService
     },
-    ApiGatewayAuthGuard
+    ApiGatewayAuthGuard,
+    PaymentsEventsConsumer
   ],
   exports: [OrdersService]
 })
