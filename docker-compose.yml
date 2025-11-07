@@ -155,6 +155,11 @@ services:
       DB_PASSWORD: orderly
       DB_NAME: orderly_catalog
       TYPEORM_SYNC: 'true'
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: catalog-service
+      CATALOG_CREATED_TOPIC: catalog.product.created
+      CATALOG_UPDATED_TOPIC: catalog.product.updated
+      CATALOG_STATUS_CHANGED_TOPIC: catalog.product.statusChanged
     ports:
       - '3004:3000'
 
