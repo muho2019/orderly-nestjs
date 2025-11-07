@@ -54,9 +54,11 @@ export class PaymentsEventsConsumer implements OnModuleInit, OnModuleDestroy {
       fromBeginning: false
     });
 
-    await this.consumer.run({
-      eachMessage: (payload) => this.handleMessage(payload)
-    });
+    void this.consumer
+      .run({
+        eachMessage: (payload) => this.handleMessage(payload)
+      })
+      .catch((error) => this.logger.error('Payments consumer crashed', error as Error));
 
     this.logger.log('Payments events consumer started');
   }
