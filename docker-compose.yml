@@ -185,6 +185,8 @@ services:
       ORDERS_SERVICE_ANONYMOUS_EMAIL:
       PAYMENTS_SERVICE_BASE_URL: http://payments-service:3000/v1/payments
       PAYMENTS_SERVICE_TIMEOUT: 5000
+      CATALOG_SERVICE_BASE_URL: http://catalog-service:3000/v1
+      CATALOG_SERVICE_TIMEOUT: 5000
     ports:
       - '4000:4000'
 

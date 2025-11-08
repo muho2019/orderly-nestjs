@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "nest start --watch",
-    "build": "nest build",
+    "dev": "ts-node -r tsconfig-paths/register --project tsconfig.json src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "jest",
-    "start": "node dist/main"
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.7",
