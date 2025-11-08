@@ -2,8 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { buildGatewayUrl } from '../gateway';
 
-const PRODUCTS_GATEWAY_URL = buildGatewayUrl('/orders/products');
-
 function getOptionalAuthorization(request: NextRequest): string | undefined {
   const header = request.headers.get('authorization');
   if (!header || header.trim().length === 0) {
@@ -17,15 +15,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const authorization = getOptionalAuthorization(request);
 
-    const response = await fetch(PRODUCTS_GATEWAY_URL, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'X-Correlation-Id': randomUUID(),
-        ...(authorization ? { Authorization: authorization } : {})
-      },
-      cache: 'no-store'
-    });
+    const response = await fetch(
+      buildGatewayUrl('/catalog/products'),
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'X-Correlation-Id': randomUUID(),
+          ...(authorization ? { Authorization: authorization } : {})
+        },
+        cache: 'no-store'
+      }
+    );
 
     const data = await response
       .json()

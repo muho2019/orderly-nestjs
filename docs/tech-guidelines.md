@@ -87,7 +87,8 @@ apps/
 ├── services/
 │   ├── auth-service/
 │   ├── orders-service/
-│   └── payments-service/
+│   ├── payments-service/
+│   └── catalog-service/
 ├── api-gateway/
 └── web/
 

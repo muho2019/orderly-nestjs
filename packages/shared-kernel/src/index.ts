@@ -13,3 +13,8 @@ export * from './payment-requested.event';
 export * from './payment-succeeded.event';
 export * from './payment-failed.event';
 export * from './payment-cancelled.event';
+export * from './product-status.enum';
+export * from './product.dto';
+export * from './catalog-product-created.event';
+export * from './catalog-product-updated.event';
+export * from './catalog-product-status-changed.event';
