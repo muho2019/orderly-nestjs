@@ -26,7 +26,7 @@ services:
       postgres-auth:
         condition: service_healthy
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       DB_HOST: postgres-auth
       DB_PORT: 5432
       DB_USER: orderly
@@ -36,6 +36,8 @@ services:
       JWT_SECRET: orderly-dev-secret
     ports:
       - '3000:3000'
+    volumes:
+      - ./apps/services/auth-service:/usr/src/app/apps/services/auth-service
 
   postgres-orders:
     image: postgres:16
@@ -62,7 +64,7 @@ services:
       postgres-orders:
         condition: service_healthy
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 3000
       DB_HOST: postgres-orders
       DB_PORT: 5432
@@ -78,6 +80,9 @@ services:
       CATALOG_SERVICE_TIMEOUT: 5000
     ports:
       - '3002:3000'
+    volumes:
+      - ./apps/services/orders-service:/usr/src/app/apps/services/orders-service
+      - ./packages/shared-kernel:/usr/src/app/packages/shared-kernel
 
   postgres-payments:
     image: postgres:16
@@ -106,7 +111,7 @@ services:
       kafka:
         condition: service_started
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 3000
       DB_HOST: postgres-payments
       DB_PORT: 5432
@@ -123,6 +128,9 @@ services:
       MOCK_PAYMENTS_DECLINE_THRESHOLD: 500000
     ports:
       - '3003:3000'
+    volumes:
+      - ./apps/services/payments-service:/usr/src/app/apps/services/payments-service
+      - ./packages/shared-kernel:/usr/src/app/packages/shared-kernel
 
   postgres-catalog:
     image: postgres:16
@@ -149,7 +157,7 @@ services:
       postgres-catalog:
         condition: service_healthy
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 3000
       DB_HOST: postgres-catalog
       DB_PORT: 5432
@@ -165,6 +173,9 @@ services:
       CATALOG_ADMIN_TOKEN: catalog-admin-secret
     ports:
       - '3004:3000'
+    volumes:
+      - ./apps/services/catalog-service:/usr/src/app/apps/services/catalog-service
+      - ./packages/shared-kernel:/usr/src/app/packages/shared-kernel
 
   api-gateway:
     build:
@@ -176,7 +187,7 @@ services:
       orders-service:
         condition: service_started
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 4000
       AUTH_SERVICE_BASE_URL: http://auth-service:3000/v1/auth
       AUTH_SERVICE_TIMEOUT: 5000
@@ -193,6 +204,9 @@ services:
       CATALOG_ADMIN_TOKEN: catalog-admin-secret
     ports:
       - '4000:4000'
+    volumes:
+      - ./apps/api-gateway:/usr/src/app/apps/api-gateway
+      - ./packages/shared-kernel:/usr/src/app/packages/shared-kernel
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -237,11 +251,14 @@ services:
     depends_on:
       - api-gateway
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       API_GATEWAY_BASE_URL: http://api-gateway:4000/v1
       PORT: 3000
     ports:
       - '3001:3000'
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages/shared-kernel:/app/packages/shared-kernel
 
 volumes:
   postgres-auth-data:

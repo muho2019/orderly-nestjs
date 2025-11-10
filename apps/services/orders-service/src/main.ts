@@ -4,7 +4,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
-    bufferLogs: true
+    bufferLogs: true,
   });
 
   app.enableCors();
@@ -12,7 +12,7 @@ async function bootstrap(): Promise<void> {
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true
+      transform: true,
     })
   );
 
