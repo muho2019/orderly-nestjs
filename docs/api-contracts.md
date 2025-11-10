@@ -163,6 +163,8 @@ Orderly의 서비스별 REST API 계약과 MVP 단계별 사용자 스토리를 
 | `PATCH` | `/v1/products/:productId` | 상품 수정 | Admin |
 | `PATCH` | `/v1/products/:productId/status` | 상품 활성/비활성 | Admin |
 
+> Admin 엔드포인트는 API Gateway가 `X-Admin-Token` 헤더로 공유 시크릿을 전달해야 하며, catalog-service는 해당 토큰이 일치하는 경우에만 요청을 처리합니다.
+
 ### User Stories
 - **AS A** 고객, **I WANT** 주문 전에 상품 정보(가격, 재고)를 확인하고 싶다.
 - **AS A** 관리자, **I WANT** 상품 정보를 등록/수정하여 최신 상태로 관리하고 싶다.

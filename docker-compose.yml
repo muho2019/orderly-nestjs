@@ -162,6 +162,7 @@ services:
       CATALOG_CREATED_TOPIC: catalog.product.created
       CATALOG_UPDATED_TOPIC: catalog.product.updated
       CATALOG_STATUS_CHANGED_TOPIC: catalog.product.statusChanged
+      CATALOG_ADMIN_TOKEN: catalog-admin-secret
     ports:
       - '3004:3000'
 
@@ -189,6 +190,7 @@ services:
       PAYMENTS_SERVICE_TIMEOUT: 5000
       CATALOG_SERVICE_BASE_URL: http://catalog-service:3000/v1
       CATALOG_SERVICE_TIMEOUT: 5000
+      CATALOG_ADMIN_TOKEN: catalog-admin-secret
     ports:
       - '4000:4000'
 

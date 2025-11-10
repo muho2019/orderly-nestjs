@@ -19,6 +19,7 @@ interface RequestMetadata {
   authorization?: string;
   correlationId?: string;
   causationId?: string;
+  requireAdmin?: boolean;
 }
 
 @Injectable()
@@ -40,7 +41,10 @@ export class CatalogService {
     authorization: string,
     dto: CreateProductRequestDto
   ): Promise<ProductDto> {
-    return this.post<ProductDto>('/products', dto, { authorization });
+    return this.post<ProductDto>('/products', dto, {
+      authorization,
+      requireAdmin: true
+    });
   }
 
   updateProduct(
@@ -48,7 +52,10 @@ export class CatalogService {
     productId: string,
     dto: UpdateProductRequestDto
   ): Promise<ProductDto> {
-    return this.patch<ProductDto>(`/products/${productId}`, dto, { authorization });
+    return this.patch<ProductDto>(`/products/${productId}`, dto, {
+      authorization,
+      requireAdmin: true
+    });
   }
 
   updateProductStatus(
@@ -56,7 +63,10 @@ export class CatalogService {
     productId: string,
     dto: UpdateProductStatusRequestDto
   ): Promise<ProductDto> {
-    return this.patch<ProductDto>(`/products/${productId}/status`, dto, { authorization });
+    return this.patch<ProductDto>(`/products/${productId}/status`, dto, {
+      authorization,
+      requireAdmin: true
+    });
   }
 
   private async get<T>(path: string, metadata: RequestMetadata): Promise<T> {
@@ -112,6 +122,18 @@ export class CatalogService {
 
     if (metadata.causationId) {
       headers['x-causation-id'] = metadata.causationId;
+    }
+
+    if (metadata.requireAdmin) {
+      const adminToken = this.configService
+        .get<string>('CATALOG_ADMIN_TOKEN', 'catalog-admin-token')
+        .trim();
+
+      if (!adminToken) {
+        throw new InternalServerErrorException('Catalog admin token is not configured');
+      }
+
+      headers['X-Admin-Token'] = adminToken;
     }
 
     return headers;

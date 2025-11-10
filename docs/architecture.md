@@ -27,6 +27,9 @@ Orderly는 **Nest.js 학습 및 포트폴리오 구축**을 목표로 하는 모
 
 > 이벤트 브로커는 Kafka를 사용하며, 모든 서비스는 게시/구독 패턴으로 이벤트를 처리합니다.
 
+> Admin 전용 catalog API는 API Gateway에서 전달하는 `X-Admin-Token` 시크릿을 검증해 관리자 요청만 처리합니다.  
+> **Roadmap:** 현재는 공유 시크릿으로 관리자 요청을 구분하지만, 추후 `auth-service`에 Role 기반 클레임을 추가해 사용자/관리자를 명확히 구분하고 API Gateway가 해당 Role을 검증한 뒤 downstream 서비스로 전달하도록 전환할 계획입니다.
+
 ---
 
 ## 3. 디렉터리 구조
