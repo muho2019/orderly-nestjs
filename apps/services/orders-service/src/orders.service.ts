@@ -56,7 +56,7 @@ export class OrdersService {
       }
     }
 
-    const { lines, total } = this.buildOrderLines(dto);
+    const { lines, total } = await this.buildOrderLines(dto);
 
     const order = new OrderEntity();
     order.userId = userId;
@@ -208,15 +208,20 @@ export class OrdersService {
     await this.ordersRepository.save(order);
   }
 
-  private buildOrderLines(dto: CreateOrderDto): { lines: OrderLineEntity[]; total: MoneyValue } {
+  private async buildOrderLines(dto: CreateOrderDto): Promise<{
+    lines: OrderLineEntity[];
+    total: MoneyValue;
+  }> {
     if (!dto.items.length) {
       throw new BadRequestException('Order must contain at least one item');
     }
 
     let total: MoneyValue | undefined;
 
-    const lines = dto.items.map((item) => {
-      const product = this.productCatalog.findById(item.productId);
+    const lines: OrderLineEntity[] = [];
+
+    for (const item of dto.items) {
+      const product = await this.productCatalog.findById(item.productId);
       if (!product) {
         throw new BadRequestException(`Unknown product: ${item.productId}`);
       }
@@ -245,8 +250,8 @@ export class OrdersService {
       line.lineTotalAmount = lineTotal.amount;
       line.lineTotalCurrency = lineTotal.currency;
 
-      return line;
-    });
+      lines.push(line);
+    }
 
     if (!total) {
       throw new BadRequestException('Order must contain at least one item');

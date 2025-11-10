@@ -1,5 +1,14 @@
-import { Injectable } from '@nestjs/common';
-import { MoneyValue } from '@orderly/shared-kernel';
+import { HttpService } from '@nestjs/axios';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  InternalServerErrorException,
+  ServiceUnavailableException
+} from '@nestjs/common';
+import { MoneyValue, ProductDto } from '@orderly/shared-kernel';
+import { isAxiosError } from 'axios';
+import { firstValueFrom } from 'rxjs';
 
 export interface ProductSnapshot {
   id: string;
@@ -8,8 +17,8 @@ export interface ProductSnapshot {
 }
 
 export abstract class ProductCatalogService {
-  abstract listAll(): readonly ProductSnapshot[];
-  abstract findById(id: string): ProductSnapshot | undefined;
+  abstract listAll(): Promise<readonly ProductSnapshot[]>;
+  abstract findById(id: string): Promise<ProductSnapshot | undefined>;
 }
 
 const MOCK_PRODUCTS: readonly ProductSnapshot[] = [
@@ -32,11 +41,63 @@ const MOCK_PRODUCTS: readonly ProductSnapshot[] = [
 
 @Injectable()
 export class MockProductCatalogService extends ProductCatalogService {
-  listAll(): readonly ProductSnapshot[] {
+  async listAll(): Promise<readonly ProductSnapshot[]> {
     return MOCK_PRODUCTS;
   }
 
-  findById(id: string): ProductSnapshot | undefined {
+  async findById(id: string): Promise<ProductSnapshot | undefined> {
     return MOCK_PRODUCTS.find((product) => product.id === id);
+  }
+}
+
+function mapProductDtoToSnapshot(dto: ProductDto): ProductSnapshot {
+  return {
+    id: dto.id,
+    name: dto.name,
+    price: MoneyValue.from(dto.price.amount, dto.price.currency)
+  };
+}
+
+@Injectable()
+export class HttpProductCatalogService extends ProductCatalogService {
+  constructor(private readonly httpService: HttpService) {
+    super();
+  }
+
+  async listAll(): Promise<readonly ProductSnapshot[]> {
+    try {
+      const response = await firstValueFrom(this.httpService.get<ProductDto[]>('/products'));
+      return response.data.map(mapProductDtoToSnapshot);
+    } catch (error) {
+      throw this.mapAxiosError(error);
+    }
+  }
+
+  async findById(id: string): Promise<ProductSnapshot | undefined> {
+    try {
+      const response = await firstValueFrom(this.httpService.get<ProductDto>(`/products/${id}`));
+      return mapProductDtoToSnapshot(response.data);
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === HttpStatus.NOT_FOUND) {
+        return undefined;
+      }
+      throw this.mapAxiosError(error);
+    }
+  }
+
+  private mapAxiosError(error: unknown): Error {
+    if (isAxiosError(error)) {
+      if (error.response) {
+        const status = error.response.status ?? HttpStatus.BAD_GATEWAY;
+        const data = error.response.data ?? {
+          message: 'Catalog service responded with an error'
+        };
+        throw new HttpException(data, status);
+      }
+
+      throw new ServiceUnavailableException('Unable to reach catalog service');
+    }
+
+    return new InternalServerErrorException('Unexpected error while contacting catalog service');
   }
 }

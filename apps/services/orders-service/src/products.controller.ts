@@ -13,8 +13,9 @@ export class ProductsController {
   constructor(private readonly productCatalog: ProductCatalogService) {}
 
   @Get()
-  findAll(): ProductResponse[] {
-    return this.productCatalog.listAll().map((product) => ({
+  async findAll(): Promise<ProductResponse[]> {
+    const products = await this.productCatalog.listAll();
+    return products.map((product) => ({
       id: product.id,
       name: product.name,
       price: {
