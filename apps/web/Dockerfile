@@ -15,4 +15,4 @@ COPY packages/shared-kernel ./packages/shared-kernel
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev", "--workspace=@orderly/web"]
+CMD ["npm", "run", "dev", "--workspace=@orderly/web", "--", "-H", "0.0.0.0"]
