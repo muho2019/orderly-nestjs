@@ -7,12 +7,14 @@ import {
   KafkaProductsEventPublisher,
   ProductsEventPublisher
 } from './events/products-event.publisher';
+import { AdminApiGuard } from './guards/admin-api.guard';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ProductEntity])],
   controllers: [ProductsController],
   providers: [
     ProductsService,
+    AdminApiGuard,
     {
       provide: ProductsEventPublisher,
       useClass: KafkaProductsEventPublisher

@@ -27,6 +27,12 @@ export default function HomePage(): JSX.Element {
         >
           주문 만들기
         </Link>
+        <Link
+          href="/catalog/manage"
+          className="inline-flex items-center gap-2 rounded-md border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/10"
+        >
+          상품 관리 (Admin)
+        </Link>
       </div>
     </section>
   );

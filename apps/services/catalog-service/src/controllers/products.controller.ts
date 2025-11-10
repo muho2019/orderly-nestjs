@@ -5,13 +5,15 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
-  Post
+  Post,
+  UseGuards
 } from '@nestjs/common';
 import { ProductDto } from '@orderly/shared-kernel';
 import { ProductsService } from '../services/products.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { UpdateProductStatusDto } from '../dto/update-product-status.dto';
+import { AdminApiGuard } from '../guards/admin-api.guard';
 
 function mapToDto(entity: any): ProductDto {
   return {
@@ -46,11 +48,13 @@ export class ProductsController {
   }
 
   @Post()
+  @UseGuards(AdminApiGuard)
   async create(@Body() dto: CreateProductDto): Promise<ProductDto> {
     return mapToDto(await this.productsService.create(dto));
   }
 
   @Patch(':id')
+  @UseGuards(AdminApiGuard)
   async update(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateProductDto
@@ -59,6 +63,7 @@ export class ProductsController {
   }
 
   @Patch(':id/status')
+  @UseGuards(AdminApiGuard)
   async updateStatus(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateProductStatusDto
