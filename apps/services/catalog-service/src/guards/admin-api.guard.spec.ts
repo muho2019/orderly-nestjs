@@ -44,4 +44,14 @@ describe('AdminApiGuard', () => {
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
+  it('throws when admin token is not configured', () => {
+    const configService = {
+      get: jest.fn().mockReturnValue(undefined)
+    } as unknown as ConfigService;
+
+    const guard = new AdminApiGuard(configService);
+    const context = buildContext({ 'x-admin-token': 'anything' });
+
+    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+  });
 });

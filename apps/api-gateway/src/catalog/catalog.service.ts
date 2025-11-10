@@ -125,9 +125,11 @@ export class CatalogService {
     }
 
     if (metadata.requireAdmin) {
-      const adminToken = this.configService
-        .get<string>('CATALOG_ADMIN_TOKEN', 'catalog-admin-token')
-        .trim();
+      const configuredToken = this.configService.get<string>('CATALOG_ADMIN_TOKEN');
+      const adminToken =
+        typeof configuredToken === 'string' && configuredToken.trim().length > 0
+          ? configuredToken.trim()
+          : null;
 
       if (!adminToken) {
         throw new InternalServerErrorException('Catalog admin token is not configured');
