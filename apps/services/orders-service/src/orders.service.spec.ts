@@ -91,7 +91,7 @@ describe('OrdersService', () => {
         }
       ]
     ]);
-    productCatalog.findById.mockImplementation((id: string) => catalogEntries.get(id));
+    productCatalog.findById.mockImplementation(async (id: string) => catalogEntries.get(id));
   });
 
   afterEach(() => {

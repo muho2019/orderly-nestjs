@@ -74,6 +74,8 @@ services:
       KAFKA_CLIENT_ID: orders-service
       ORDERS_CREATED_TOPIC: orders.order.created
       ORDERS_STATUS_CHANGED_TOPIC: orders.order.statusChanged
+      CATALOG_SERVICE_BASE_URL: http://catalog-service:3000/v1
+      CATALOG_SERVICE_TIMEOUT: 5000
     ports:
       - '3002:3000'
 
