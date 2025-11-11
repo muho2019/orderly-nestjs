@@ -1,38 +1,18 @@
-FROM node:20-alpine AS deps
+FROM node:20-alpine AS base
 
-WORKDIR /app
+ENV NODE_ENV=development
+WORKDIR /usr/src/app
 
-COPY package.json package-lock.json turbo.json tsconfig.base.json ./
-COPY apps/api-gateway/package.json apps/api-gateway/package.json
-COPY apps/api-gateway/.env.example apps/api-gateway/.env.example
-COPY packages/shared-kernel/package.json packages/shared-kernel/package.json
-COPY packages/testing/package.json packages/testing/package.json
+RUN apk add --no-cache curl && corepack enable && corepack prepare npm@10.7.0 --activate
 
-RUN npm install --legacy-peer-deps
+COPY package*.json ./
+COPY turbo.json tsconfig.base.json ./
+COPY apps/api-gateway/package.json apps/api-gateway/
+COPY apps/api-gateway/tsconfig.json apps/api-gateway/
+COPY packages/shared-kernel/package.json packages/shared-kernel/
+RUN npm install
 
-FROM node:20-alpine AS build
+COPY apps/api-gateway ./apps/api-gateway
+COPY packages/shared-kernel ./packages/shared-kernel
 
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-RUN npm run build --workspace=@orderly/shared-kernel
-RUN npm run build --workspace=@orderly/api-gateway
-
-FROM node:20-alpine AS runner
-
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=4000
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=build /app/apps/api-gateway/dist ./apps/api-gateway/dist
-COPY apps/api-gateway/package.json ./apps/api-gateway/package.json
-COPY apps/api-gateway/.env.example ./apps/api-gateway/.env.example
-COPY --from=build /app/packages/shared-kernel/package.json ./packages/shared-kernel/package.json
-COPY --from=build /app/packages/shared-kernel/dist ./packages/shared-kernel/dist
-COPY packages/testing ./packages/testing
-
-EXPOSE 4000
-
-CMD ["node", "apps/api-gateway/dist/main.js"]
+CMD ["npm", "run", "dev", "--workspace", "@orderly/api-gateway"]
