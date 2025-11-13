@@ -3,6 +3,12 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
 type FormState =
   | { status: 'idle' }
   | { status: 'submitting' }
@@ -66,84 +72,68 @@ export default function RegisterPage(): JSX.Element {
   return (
     <section className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold">회원 등록</h2>
-        <p className="text-sm text-slate-300">
-          주문 서비스를 이용하려면 이메일과 비밀번호를 입력하여 계정을 생성하세요.
+        <h2 className="text-3xl font-semibold">회원 등록</h2>
+        <p className="text-sm text-muted-foreground">
+          주문·결제 서비스를 이용하려면 이메일과 비밀번호를 설정해 계정을 생성하세요.
         </p>
       </div>
 
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <label htmlFor="email" className="block text-sm font-medium text-slate-200">
-            이메일
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="you@example.com"
-            autoComplete="email"
-          />
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>계정 정보 입력</CardTitle>
+          <CardDescription>입력된 정보는 Auth 서비스에서 즉시 검증 후 저장됩니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="email">이메일</Label>
+              <Input id="email" name="email" type="email" required placeholder="you@example.com" autoComplete="email" />
+            </div>
 
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-medium text-slate-200">
-            비밀번호
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            minLength={8}
-            required
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="8자 이상 비밀번호"
-            autoComplete="new-password"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">비밀번호</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                minLength={8}
+                required
+                placeholder="8자 이상 비밀번호"
+                autoComplete="new-password"
+              />
+            </div>
 
-        <div className="space-y-2">
-          <label htmlFor="name" className="block text-sm font-medium text-slate-200">
-            이름 (선택)
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="홍길동"
-            autoComplete="name"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">이름 (선택)</Label>
+              <Input id="name" name="name" type="text" placeholder="홍길동" autoComplete="name" />
+            </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="inline-flex items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600"
-        >
-          {isSubmitting ? '등록 중...' : '회원가입'}
-        </button>
-      </form>
+            <Button type="submit" disabled={isSubmitting} className="w-full">
+              {isSubmitting ? '등록 중...' : '회원가입'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-muted-foreground">
         이미 계정이 있으신가요?{' '}
-        <Link href="/login" className="text-emerald-400 underline-offset-4 hover:underline">
+        <Link href="/login" className="text-primary underline-offset-4 hover:underline">
           로그인하러 가기
         </Link>
       </p>
 
       {formState.status === 'success' && (
-        <p className="rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-          {formState.message}
-        </p>
+        <Alert variant="success">
+          <AlertTitle>회원 등록 완료</AlertTitle>
+          <AlertDescription>{formState.message}</AlertDescription>
+        </Alert>
       )}
 
       {formState.status === 'error' && (
-        <p className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-          {formState.message}
-        </p>
+        <Alert variant="destructive">
+          <AlertTitle>회원 등록 실패</AlertTitle>
+          <AlertDescription>{formState.message}</AlertDescription>
+        </Alert>
       )}
     </section>
   );

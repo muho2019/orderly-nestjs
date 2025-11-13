@@ -3,6 +3,13 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
 type FormState =
   | { status: 'idle' }
   | { status: 'submitting' }
@@ -63,82 +70,85 @@ export default function LoginPage(): JSX.Element {
   return (
     <section className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold">로그인</h2>
-        <p className="text-sm text-slate-300">
-          발급된 계정으로 로그인하여 Orderly 서비스를 체험해 보세요.
+        <h2 className="text-3xl font-semibold">로그인</h2>
+        <p className="text-sm text-muted-foreground">
+          발급된 계정으로 로그인하여 Orderly의 주문·카탈로그 기능을 체험해 보세요.
         </p>
       </div>
 
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <label htmlFor="email" className="block text-sm font-medium text-slate-200">
-            이메일
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="you@example.com"
-            autoComplete="email"
-          />
-        </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <CardTitle>계정 인증</CardTitle>
+              <CardDescription>API Gateway는 로그인 시 Orders/Auth 서비스와 JWT 계약을 검증합니다.</CardDescription>
+            </div>
+            <Badge variant="secondary">JWT 기반</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="email">이메일</Label>
+              <Input id="email" name="email" type="email" required placeholder="you@example.com" autoComplete="email" />
+            </div>
 
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-medium text-slate-200">
-            비밀번호
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            minLength={8}
-            required
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="비밀번호"
-            autoComplete="current-password"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">비밀번호</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                minLength={8}
+                required
+                placeholder="비밀번호"
+                autoComplete="current-password"
+              />
+            </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="inline-flex items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600"
-        >
-          {isSubmitting ? '로그인 중...' : '로그인'}
-        </button>
-      </form>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? '로그인 중...' : '로그인'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      {formState.status === 'success' && (
-        <div className="space-y-3 rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-          <p>로그인 성공! 프로필을 수정하거나 비밀번호를 변경해 보세요.</p>
-          <p>
-            <Link href="/profile" className="text-emerald-300 underline-offset-4 hover:underline">
-              프로필 페이지로 이동
-            </Link>
-          </p>
-          {formState.token && (
-            <details className="text-xs text-emerald-100">
-              <summary className="cursor-pointer font-medium">발급된 토큰 보기</summary>
-              <code className="mt-2 block break-all">{formState.token}</code>
-            </details>
-          )}
-        </div>
-      )}
-
-      {formState.status === 'error' && (
-        <p className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-          {formState.message}
-        </p>
-      )}
-
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-muted-foreground">
         아직 계정이 없으신가요?{' '}
-        <Link href="/register" className="text-emerald-400 underline-offset-4 hover:underline">
+        <Link href="/register" className="text-primary underline-offset-4 hover:underline">
           회원가입하러 가기
         </Link>
       </p>
+
+      {formState.status === 'success' && (
+        <Alert variant="success" className="flex flex-col gap-2">
+          <AlertTitle>로그인 성공</AlertTitle>
+          <AlertDescription className="space-y-2 text-sm text-emerald-50">
+            <p>프로필을 수정하거나 주문을 진행해 Orderly의 백엔드 플로우를 이어가 보세요.</p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Button asChild size="sm" variant="secondary">
+                <Link href="/profile">프로필 페이지</Link>
+              </Button>
+              <Button asChild size="sm" variant="secondary">
+                <Link href="/orders">주문 관리</Link>
+              </Button>
+            </div>
+            {formState.token && (
+              <details className="rounded-lg bg-emerald-500/10 p-3 text-xs text-emerald-100">
+                <summary className="cursor-pointer font-medium">발급된 토큰 보기</summary>
+                <code className="mt-2 block break-all">{formState.token}</code>
+              </details>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {formState.status === 'error' && (
+        <Alert variant="destructive">
+          <AlertTitle>로그인 실패</AlertTitle>
+          <AlertDescription>{formState.message}</AlertDescription>
+        </Alert>
+      )}
     </section>
   );
 }

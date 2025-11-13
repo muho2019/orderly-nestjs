@@ -18,7 +18,7 @@ import { AuthModule } from '../auth/auth.module';
         return {
           baseURL: configService.get<string>(
             'ORDERS_SERVICE_BASE_URL',
-            'http://localhost:3000/v1/orders'
+            'http://localhost:3002/v1/orders'
           ),
           timeout,
           headers: {

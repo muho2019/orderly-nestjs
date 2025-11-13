@@ -3,6 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+
 const TOKEN_KEY = 'orderly_token';
 
 export default function LogoutPage(): JSX.Element {
@@ -22,8 +25,15 @@ export default function LogoutPage(): JSX.Element {
 
   return (
     <section className="space-y-4">
-      <h2 className="text-2xl font-semibold">로그아웃</h2>
-      <p className="text-sm text-slate-300">로그아웃 처리 중입니다...</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>로그아웃 처리 중</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>세션을 종료하고 로그인 페이지로 이동합니다. 잠시만 기다려 주세요.</p>
+          <Skeleton className="h-3 w-full" />
+        </CardContent>
+      </Card>
     </section>
   );
 }

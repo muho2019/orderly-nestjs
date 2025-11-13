@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix('v1');
 
-  const port = process.env.PORT ?? 3000;
+  const port = process.env.PORT ?? 3002;
   await app.listen(port);
   Logger.log(`Orders service is running on port ${port}`, 'Bootstrap');
 }

@@ -2,6 +2,26 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, Package, ReceiptText, ShoppingCart } from 'lucide-react';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 type Money = {
   amount: number;
@@ -60,6 +80,23 @@ type PaymentState =
   | { status: 'processing' }
   | { status: 'success'; message: string }
   | { status: 'error'; message: string };
+
+const ORDER_STATUS_BADGE: Record<
+  string,
+  { label: string; variant: 'default' | 'secondary' | 'success' | 'outline' | 'destructive' }
+> = {
+  CREATED: { label: '생성됨', variant: 'secondary' },
+  CONFIRMED: { label: '확정', variant: 'success' },
+  COMPLETED: { label: '완료', variant: 'success' },
+  CANCELLED: { label: '취소됨', variant: 'destructive' },
+  FAILED: { label: '실패', variant: 'destructive' }
+};
+
+function getStatusBadge(
+  status: string
+): { label: string; variant: 'default' | 'secondary' | 'success' | 'outline' | 'destructive' } {
+  return ORDER_STATUS_BADGE[status] ?? { label: status, variant: 'outline' };
+}
 
 function toDisplayAmount(money: Money): number {
   const fractionDigits = new Intl.NumberFormat('en', {
@@ -580,320 +617,441 @@ export default function OrdersPage(): JSX.Element {
   const isLoadingProducts = fetchState.status === 'loading';
   const isSubmitting = orderState.status === 'submitting';
   const isRefreshingOrders = ordersState.status === 'loading';
+  const totalSelectedQuantity = selectedItems.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
     <section className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold">상품 주문</h2>
-        <p className="text-sm text-slate-300">
-          Mock 카탈로그에서 원하는 상품을 선택하고 주문을 생성해보세요. 주문 전 로그인 여부를 확인하세요.
+        <div className="flex items-center gap-2 text-sm uppercase tracking-wide text-muted-foreground">
+          <ShoppingCart className="h-4 w-4" />
+          Orders Service
+        </div>
+        <h2 className="text-3xl font-semibold">주문 오케스트레이션</h2>
+        <p className="text-sm text-muted-foreground">
+          Mock 카탈로그에서 상품을 선택해 주문을 생성하고, Kafka 이벤트 파이프라인을 통해 결제·읽기 모델로 이어지는 흐름을
+          살펴보세요.
         </p>
       </div>
 
-      {fetchState.status === 'error' && (
-        <div className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-          <p>{fetchState.message}</p>
-          <p className="mt-2 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setFetchState({ status: 'loading' });
-                setTimeout(() => {
-                  window.location.reload();
-                }, 50);
-              }}
-              className="underline"
-            >
-              새로고침
-            </button>
-          </p>
-        </div>
-      )}
+      <Tabs defaultValue="create" className="space-y-6">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="create">주문 생성</TabsTrigger>
+          <TabsTrigger value="history">주문 내역</TabsTrigger>
+        </TabsList>
 
-      {fetchState.status === 'loading' && (
-        <p className="text-sm text-slate-300">상품 목록을 불러오는 중입니다...</p>
-      )}
+        <TabsContent value="create" className="space-y-6">
+          {fetchState.status === 'loading' && (
+            <Card className="border-border/70">
+              <CardHeader>
+                <CardTitle>상품 정보를 불러오는 중</CardTitle>
+                <CardDescription>Catalog 서비스의 Mock 데이터를 조회하고 있습니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center gap-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                잠시만 기다려주세요.
+              </CardContent>
+            </Card>
+          )}
 
-      {fetchState.status === 'success' && (
-        <div className="space-y-6">
-          <ul className="space-y-4">
-            {fetchState.products.map((product) => {
-              const quantity = quantities[product.id] ?? 0;
-              const lineTotal =
-                quantity > 0
-                  ? formatMoney({
-                      amount: product.price.amount * quantity,
-                      currency: product.price.currency
-                    })
-                  : null;
-
-              return (
-                <li
-                  key={product.id}
-                  className="flex flex-col gap-3 rounded-md border border-slate-800 bg-slate-900/40 p-4"
+          {fetchState.status === 'error' && (
+            <Alert variant="destructive">
+              <AlertTitle>상품 목록을 불러오지 못했습니다.</AlertTitle>
+              <AlertDescription className="flex flex-col gap-3 text-sm">
+                <p>{fetchState.message}</p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setFetchState({ status: 'loading' });
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 50);
+                  }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-slate-100">{product.name}</h3>
-                      <p className="text-sm text-slate-400">{formatMoney(product.price)}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="h-8 w-8 rounded-md border border-slate-700 bg-slate-800 text-lg text-slate-100 transition hover:bg-slate-700"
-                        onClick={() => setQuantity(product.id, (quantities[product.id] ?? 0) - 1)}
-                        disabled={quantity === 0}
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        min={0}
-                        max={99}
-                        value={quantity}
-                        onChange={(event) => setQuantity(product.id, Number(event.target.value))}
-                        className="h-8 w-16 rounded-md border border-slate-700 bg-slate-900 text-center text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                      <button
-                        type="button"
-                        className="h-8 w-8 rounded-md border border-emerald-600 bg-emerald-500 text-lg text-emerald-950 transition hover:bg-emerald-400"
-                        onClick={() => setQuantity(product.id, (quantities[product.id] ?? 0) + 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
+                  다시 시도
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
 
-                  {lineTotal && (
-                    <p className="text-xs text-emerald-300">소계: {lineTotal}</p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          {fetchState.status === 'success' && (
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
+                {fetchState.products.map((product) => {
+                  const quantity = quantities[product.id] ?? 0;
+                  const lineTotal =
+                    quantity > 0
+                      ? formatMoney({
+                          amount: product.price.amount * quantity,
+                          currency: product.price.currency
+                        })
+                      : null;
 
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-slate-200" htmlFor="order-note">
-              주문 메모 (선택)
-            </label>
-            <textarea
-              id="order-note"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              rows={3}
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              placeholder="예: 문 앞에 두고 가주세요."
-            />
-          </div>
-
-          <div className="flex flex-col gap-3 rounded-md border border-slate-800 bg-slate-900/60 p-4 text-sm">
-            <div className="flex items-center justify-between text-slate-300">
-              <span>선택한 상품 수</span>
-              <span>{selectedItems.reduce((acc, item) => acc + item.quantity, 0)}개</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-300">
-              <span>총 금액</span>
-              <span>{totalMoney ? formatMoney(totalMoney) : '0'}</span>
-            </div>
-            <p className="text-xs text-slate-500">
-              주문을 제출하면 Orders 서비스에서 Kafka 이벤트를 발행하고, 향후 결제 및 읽기 모델과 연동됩니다.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={isSubmitting || isLoadingProducts || selectedItems.length === 0}
-            className="inline-flex w-full items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700"
-          >
-            {isSubmitting ? '주문 생성 중...' : '주문 생성'}
-          </button>
-        </div>
-      )}
-
-      {orderState.status === 'success' && (
-        <div className="rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-          <p>주문이 성공적으로 생성되었습니다.</p>
-          <p className="mt-1 text-xs text-emerald-100">주문 ID: {orderState.orderId}</p>
-          <p className="mt-3 text-xs text-emerald-100">
-            <Link href="/" className="underline">
-              홈으로 돌아가기
-            </Link>{' '}
-            또는{' '}
-            <button
-              type="button"
-              onClick={() => setOrderState({ status: 'idle' })}
-              className="underline"
-            >
-              계속 주문하기
-            </button>
-          </p>
-        </div>
-      )}
-
-      {orderState.status === 'error' && (
-        <div className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-          {orderState.message}
-        </div>
-      )}
-
-      {paymentState.status === 'processing' && (
-        <div className="rounded-md border border-amber-500 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
-          결제 요청을 처리하고 있습니다...
-        </div>
-      )}
-
-      {paymentState.status === 'success' && (
-        <div className="rounded-md border border-emerald-500 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-          {paymentState.message}
-        </div>
-      )}
-
-      {paymentState.status === 'error' && (
-        <div className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-          {paymentState.message}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-2xl font-semibold">내 주문 내역</h2>
-          <button
-            type="button"
-            onClick={() => void loadOrders()}
-            disabled={isRefreshingOrders}
-            className="inline-flex w-full items-center justify-center rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500 sm:w-auto"
-          >
-            {isRefreshingOrders ? '갱신 중...' : '새로고침'}
-          </button>
-        </div>
-        <p className="text-sm text-slate-300">
-          로그인한 계정으로 생성한 주문을 불러와 현황을 확인할 수 있습니다.
-        </p>
-      </div>
-
-      {ordersState.status === 'idle' && (
-        <p className="text-sm text-slate-400">
-          로그인 후 주문을 생성하면 이곳에서 주문 내역을 확인할 수 있습니다.
-        </p>
-      )}
-
-      {ordersState.status === 'loading' && (
-        <p className="text-sm text-slate-300">주문 내역을 불러오는 중입니다...</p>
-      )}
-
-      {ordersState.status === 'error' && (
-        <div className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-          <p>{ordersState.message}</p>
-          <p className="mt-2 text-xs">
-            <button type="button" onClick={() => void loadOrders()} className="underline">
-              다시 시도
-            </button>
-          </p>
-        </div>
-      )}
-
-      {ordersState.status === 'success' &&
-        (ordersState.orders.length === 0 ? (
-          <p className="text-sm text-slate-400">아직 생성된 주문이 없습니다.</p>
-        ) : (
-          <ul className="space-y-4">
-            {ordersState.orders.map((order) => {
-              const cancelState = (cancelStates[order.id] ?? { status: 'idle' }) as CancelState;
-              const isCancelling = cancelState.status === 'loading';
-              const cancelMessage =
-                cancelState.status === 'error' || cancelState.status === 'success'
-                  ? cancelState.message
-                  : undefined;
-
-              return (
-                <li
-                  key={order.id}
-                  className="space-y-3 rounded-md border border-slate-800 bg-slate-900/40 p-4"
-                >
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-100">
-                        주문{' '}
-                        <span className="font-mono text-xs text-slate-400" title={order.id}>
-                          {order.id}
-                        </span>
-                      </p>
-                      <p className="text-xs text-slate-400">{formatDateTime(order.createdAt)}</p>
-                    </div>
-                    <div className="text-right text-sm text-slate-300">
-                      <p className="font-medium text-emerald-300">{formatMoney(order.total)}</p>
-                      <p className="text-xs text-slate-400">{order.status}</p>
-                    </div>
-                  </div>
-
-                  {order.note && (
-                    <p className="text-xs text-slate-400">메모: {order.note}</p>
-                  )}
-
-                  {order.clientReference && (
-                    <p className="text-xs text-slate-500">
-                      클라이언트 참조:{' '}
-                      <span className="font-mono">{order.clientReference}</span>
-                    </p>
-                  )}
-
-                  {order.status === 'CREATED' && (
-                    <div className="flex flex-col gap-2 rounded-md border border-slate-800 bg-slate-900/40 p-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-xs text-slate-400">
-                        주문이 확정되기 전까지 취소할 수 있습니다.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void handleCancel(order.id)}
-                        disabled={isCancelling || isRefreshingOrders}
-                        className="inline-flex items-center justify-center rounded-md border border-rose-500 px-3 py-1 text-xs font-medium text-rose-200 transition hover:bg-rose-500 hover:text-rose-950 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
-                      >
-                        {isCancelling ? '취소 중...' : '주문 취소'}
-                      </button>
-                    </div>
-                  )}
-
-                  {cancelState.status === 'error' && cancelMessage && (
-                    <p className="text-xs text-rose-400">{cancelMessage}</p>
-                  )}
-
-                  {cancelState.status === 'success' && cancelMessage && (
-                    <p className="text-xs text-emerald-300">{cancelMessage}</p>
-                  )}
-
-                  <div className="rounded-md border border-slate-800 bg-slate-900/60 p-3">
-                    <p className="text-xs font-medium text-slate-300">주문 상품</p>
-                    <ul className="mt-2 space-y-2 text-sm text-slate-200">
-                      {order.items.map((item, index) => {
-                        const productName =
-                          productLookup[item.productId]?.name ?? item.productId;
-                        return (
-                          <li
-                            key={`${order.id}-${item.productId}-${index}`}
-                            className="flex items-center justify-between gap-3"
+                  return (
+                    <Card
+                      key={product.id}
+                      className={cn(
+                        'border-border/60 transition hover:border-primary/60',
+                        quantity > 0 && 'border-primary bg-primary/5'
+                      )}
+                    >
+                      <CardHeader className="flex flex-row items-start justify-between gap-3">
+                        <div>
+                          <CardTitle className="text-xl">{product.name}</CardTitle>
+                          <CardDescription>{formatMoney(product.price)}</CardDescription>
+                        </div>
+                        {quantity > 0 && (
+                          <Badge variant="success" className="whitespace-nowrap">
+                            {quantity}개 선택
+                          </Badge>
+                        )}
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            disabled={quantity === 0}
+                            onClick={() => setQuantity(product.id, quantity - 1)}
                           >
-                            <span className="text-slate-100">{productName}</span>
-                            <span className="text-xs text-slate-400">
-                              {item.quantity}개 · {formatMoney(item.lineTotal)}
-                            </span>
+                            -
+                          </Button>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={99}
+                            value={quantity}
+                            onChange={(event) =>
+                              setQuantity(product.id, Number(event.target.value) || 0)
+                            }
+                            className="w-20 text-center"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setQuantity(product.id, quantity + 1)}
+                          >
+                            +
+                          </Button>
+                        </div>
+                        {lineTotal && (
+                          <p className="text-xs text-muted-foreground">소계: {lineTotal}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>주문 요약</CardTitle>
+                  <CardDescription>
+                    선택한 상품과 메모를 확인한 뒤 주문을 제출하면 Orders 서비스가 Kafka 이벤트를 발행합니다.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">선택된 상품</span>
+                      <span className="font-semibold text-foreground">{totalSelectedQuantity}개</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-muted-foreground">총 금액</span>
+                      <span className="text-lg font-semibold text-primary">
+                        {totalMoney ? formatMoney(totalMoney) : '0원'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedItems.length > 0 ? (
+                    <ul className="divide-y divide-border/70 rounded-xl border border-border/70">
+                      {selectedItems.map((item) => {
+                        const lineTotalMoney = {
+                          amount: item.product.price.amount * item.quantity,
+                          currency: item.product.price.currency
+                        };
+                        return (
+                          <li key={item.product.id} className="flex items-center justify-between p-3 text-sm">
+                            <div>
+                              <p className="font-medium">{item.product.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatMoney(item.product.price)}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {item.quantity}개 · {formatMoney(lineTotalMoney)}
+                            </p>
                           </li>
                         );
                       })}
                     </ul>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        ))}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">상품을 선택하면 소계가 나타납니다.</p>
+                  )}
 
-      <div className="rounded-md border border-slate-800 bg-slate-900/50 px-4 py-3 text-xs text-slate-400">
-        <p>주문 서비스 API는 MVP 1 단계에서 Mock 상품 데이터를 사용합니다.</p>
-        <p className="mt-2">
-          로그인 토큰은 로컬 스토리지에 저장되며, 주문 시 Bearer 토큰으로 전송되어 API Gateway가 주입한 헤더를 시뮬레이션합니다.
-        </p>
-      </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="order-note">주문 메모 (선택)</Label>
+                    <Textarea
+                      id="order-note"
+                      value={note}
+                      onChange={(event) => setNote(event.target.value)}
+                      rows={3}
+                      placeholder="예: 문 앞에 두고 가주세요."
+                    />
+                  </div>
+
+                  <Button
+                    type="button"
+                    size="lg"
+                    disabled={isSubmitting || isLoadingProducts || selectedItems.length === 0}
+                    onClick={() => void handleSubmit()}
+                  >
+                    {isSubmitting ? '주문 생성 중...' : '주문 생성'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {orderState.status === 'success' && (
+            <Alert variant="success">
+              <AlertTitle>주문이 생성되었습니다.</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>주문 ID: {orderState.orderId}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => setOrderState({ status: 'idle' })}>
+                    계속 주문하기
+                  </Button>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/">홈으로 이동</Link>
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {orderState.status === 'error' && (
+            <Alert variant="destructive">
+              <AlertTitle>주문 생성 실패</AlertTitle>
+              <AlertDescription>{orderState.message}</AlertDescription>
+            </Alert>
+          )}
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>내 주문 내역</CardTitle>
+              <CardDescription>로그인한 계정으로 생성한 주문을 확인하고 관리하세요.</CardDescription>
+            </div>
+            <Button type="button" variant="outline" onClick={() => void loadOrders()} disabled={isRefreshingOrders}>
+              {isRefreshingOrders ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  갱신 중...
+                </>
+              ) : (
+                <>
+                  <ReceiptText className="mr-2 h-4 w-4" />
+                  새로고침
+                </>
+              )}
+            </Button>
+          </div>
+
+          {ordersState.status === 'idle' && (
+            <Card className="border-dashed">
+              <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
+                <p>로그인 후 주문을 생성하면 이곳에서 주문 내역을 확인할 수 있습니다.</p>
+                <Button asChild variant="secondary" size="sm">
+                  <Link href="/login">로그인 하러 가기</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {ordersState.status === 'loading' && (
+            <Card className="border-border/70">
+              <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                주문 내역을 불러오는 중입니다...
+              </CardContent>
+            </Card>
+          )}
+
+          {ordersState.status === 'error' && (
+            <Alert variant="destructive">
+              <AlertTitle>주문 내역을 가져오지 못했습니다.</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>{ordersState.message}</p>
+                <Button variant="secondary" size="sm" onClick={() => void loadOrders()}>
+                  다시 시도
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {ordersState.status === 'success' && ordersState.orders.length === 0 && (
+            <Card>
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                생성된 주문이 없습니다. 주문을 만들면 목록이 채워집니다.
+              </CardContent>
+            </Card>
+          )}
+
+          {ordersState.status === 'success' && ordersState.orders.length > 0 && (
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>주문</TableHead>
+                      <TableHead>상태</TableHead>
+                      <TableHead>총 금액</TableHead>
+                      <TableHead>생성일</TableHead>
+                      <TableHead className="text-right">액션</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ordersState.orders.map((order) => {
+                      const cancelState = (cancelStates[order.id] ?? { status: 'idle' }) as CancelState;
+                      const isCancelling = cancelState.status === 'loading';
+                      const statusBadge = getStatusBadge(order.status);
+
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell>
+                            <div className="flex flex-col text-sm">
+                              <span className="font-medium">{order.id}</span>
+                              {order.note && <span className="text-xs text-muted-foreground">메모: {order.note}</span>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                          </TableCell>
+                          <TableCell>{formatMoney(order.total)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {formatDateTime(order.createdAt)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    상세
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>주문 상세</DialogTitle>
+                                    <DialogDescription>{order.id}</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-3 text-sm">
+                                    <p className="font-medium text-foreground">상품 목록</p>
+                                    <ul className="space-y-2 rounded-xl border border-border/70 p-3">
+                                      {order.items.map((item, index) => {
+                                        const productName = productLookup[item.productId]?.name ?? item.productId;
+                                        return (
+                                          <li
+                                            key={`${order.id}-${item.productId}-${index}`}
+                                            className="flex items-center justify-between"
+                                          >
+                                            <span>{productName}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              {item.quantity}개 · {formatMoney(item.lineTotal)}
+                                            </span>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                    {order.note && (
+                                      <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm">
+                                        <p className="text-xs uppercase tracking-wide text-muted-foreground">주문 메모</p>
+                                        <p className="mt-1 text-foreground">{order.note}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+
+                              {order.status === 'CREATED' && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isCancelling || isRefreshingOrders}
+                                    onClick={() => void handleCancel(order.id)}
+                                  >
+                                    {isCancelling ? '취소 중...' : '주문 취소'}
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={paymentState.status === 'processing'}
+                                    onClick={() => void requestPaymentForOrder(order)}
+                                  >
+                                    {paymentState.status === 'processing' ? '결제 중...' : '결제 요청'}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                            {cancelState.status !== 'idle' && cancelState.message && (
+                              <p
+                                className={cn(
+                                  'mt-2 text-xs',
+                                  cancelState.status === 'error' ? 'text-destructive' : 'text-emerald-400'
+                                )}
+                              >
+                                {cancelState.message}
+                              </p>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {paymentState.status === 'processing' && (
+        <Alert variant="info">
+          <AlertTitle>결제 요청 중</AlertTitle>
+          <AlertDescription>Payments 서비스에서 결제 이벤트를 처리하는 중입니다.</AlertDescription>
+        </Alert>
+      )}
+
+      {paymentState.status === 'success' && (
+        <Alert variant="success">
+          <AlertTitle>결제가 완료되었습니다.</AlertTitle>
+          <AlertDescription>{paymentState.message}</AlertDescription>
+        </Alert>
+      )}
+
+      {paymentState.status === 'error' && (
+        <Alert variant="destructive">
+          <AlertTitle>결제 요청 실패</AlertTitle>
+          <AlertDescription>{paymentState.message}</AlertDescription>
+        </Alert>
+      )}
+
+      <Card className="border-border/70 bg-muted/20">
+        <CardHeader>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Package className="h-4 w-4" />
+            <p className="text-sm font-medium">Architecture Notes</p>
+          </div>
+          <CardTitle className="text-xl">MVP 1 주문 플로우</CardTitle>
+          <CardDescription>
+            주문 생성 시 Orders → Kafka → Payments 순으로 이벤트가 이어지며, 로그인 토큰은 Local Storage의 Bearer 값을 통해
+            API Gateway 인증을 시뮬레이션합니다.
+          </CardDescription>
+        </CardHeader>
+      </Card>
     </section>
   );
 }
