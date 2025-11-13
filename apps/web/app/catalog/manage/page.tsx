@@ -1,6 +1,33 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ClipboardList, Package, PencilLine, PlusCircle, RefreshCw } from 'lucide-react';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 type Money = {
   amount: number;
@@ -75,6 +102,7 @@ export default function CatalogManagePage(): JSX.Element {
   const [editState, setEditState] = useState<ActionState>({ status: 'idle' });
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusSelection, setStatusSelection] = useState<Record<string, string>>({});
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
 
   const loadProducts = useCallback(async () => {
     setProductsState({ status: 'loading' });
@@ -197,6 +225,7 @@ export default function CatalogManagePage(): JSX.Element {
       thumbnailUrl: product.thumbnailUrl ?? ''
     });
     setEditState({ status: 'idle' });
+    setEditDialogOpen(true);
   }
 
   function computeEditPayload(): Record<string, unknown> | null {
@@ -294,6 +323,8 @@ export default function CatalogManagePage(): JSX.Element {
         status: 'success',
         message: '상품 정보가 업데이트되었습니다.'
       });
+      setEditDialogOpen(false);
+      setEditTarget(null);
       await loadProducts();
     } catch (error) {
       const message =
@@ -357,307 +388,349 @@ export default function CatalogManagePage(): JSX.Element {
   }, [productsState]);
 
   return (
-    <div className="space-y-10">
-      <header className="space-y-3">
-        <h1 className="text-3xl font-semibold">상품 관리</h1>
-        <p className="text-sm text-slate-300">
-          관리자 전용 페이지입니다. API Gateway 인증 토큰을 입력한 뒤 상품을 등록·수정하거나 상태를 전환하세요.
-        </p>
-        <p className="text-xs text-slate-400">
-          서버는 catalog-service와 통신할 때 공유된 X-Admin-Token을 전달합니다. (추후 Role 기반 권한으로 전환 예정)
-        </p>
-      </header>
-
-      <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-5">
-        <h2 className="text-xl font-semibold text-emerald-300">새 상품 등록</h2>
-        <form className="mt-4 space-y-4" onSubmit={handleCreate}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">상품명</span>
-              <input
-                type="text"
-                required
-                value={createForm.name}
-                onChange={(event) => updateCreateForm('name', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
-
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">SKU</span>
-              <input
-                type="text"
-                value={createForm.sku}
-                onChange={(event) => updateCreateForm('sku', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
-          </div>
-
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-200">설명</span>
-            <textarea
-              value={createForm.description}
-              onChange={(event) => updateCreateForm('description', event.target.value)}
-              rows={3}
-              className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-            />
-          </label>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">가격 (KRW 기준 원 단위)</span>
-              <input
-                type="number"
-                min="1"
-                required
-                value={createForm.priceAmount}
-                onChange={(event) => updateCreateForm('priceAmount', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
-
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">통화</span>
-              <input
-                type="text"
-                required
-                value={createForm.priceCurrency}
-                onChange={(event) => updateCreateForm('priceCurrency', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm uppercase focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
-
-            <label className="space-y-1 text-sm md:col-span-1">
-              <span className="font-medium text-slate-200">썸네일 URL</span>
-              <input
-                type="url"
-                value={createForm.thumbnailUrl}
-                onChange={(event) => updateCreateForm('thumbnailUrl', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
-          </div>
-
-          <button
-            type="submit"
-            disabled={createState.status === 'submitting'}
-            className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600"
-          >
-            {createState.status === 'submitting' ? '등록 중...' : '상품 등록'}
-          </button>
-        </form>
-        {createState.status === 'error' && (
-          <p className="mt-3 rounded-md border border-rose-500 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
-            {createState.message}
-          </p>
-        )}
-        {createState.status === 'success' && (
-          <p className="mt-3 rounded-md border border-emerald-500 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
-            {createState.message ?? '상품이 등록되었습니다.'}
-          </p>
-        )}
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold">상품 목록</h2>
-            {latestUpdateInfo && (
-              <p className="text-xs text-slate-400">최근 수정: {latestUpdateInfo}</p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              void loadProducts();
-            }}
-            className="rounded-md border border-slate-600 px-3 py-1 text-sm text-slate-100 hover:border-emerald-500"
-          >
-            새로고침
-          </button>
+    <section className="space-y-8">
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-sm uppercase tracking-wide text-muted-foreground">
+          <Package className="h-4 w-4" />
+          Catalog Admin
         </div>
+        <h1 className="text-3xl font-semibold">상품 관리</h1>
+        <p className="text-sm text-muted-foreground">
+          API Gateway에 관리자 토큰을 전달해 catalog-service와 직접 통신하며 상품을 등록·수정하거나 상태를 전환합니다.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          MVP 단계에서는 공유된 X-Admin-Token을 사용하며, 추후 Role 기반 권한으로 전환할 예정입니다.
+        </p>
+      </div>
 
-        {productsState.status === 'loading' && (
-          <p className="text-sm text-slate-300">상품 목록을 불러오는 중입니다...</p>
-        )}
+      <Tabs defaultValue="create" className="space-y-6">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="create">신규 상품 등록</TabsTrigger>
+          <TabsTrigger value="manage">상품 상태/수정</TabsTrigger>
+        </TabsList>
 
-        {productsState.status === 'error' && (
-          <p className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-            {productsState.message}
-          </p>
-        )}
+        <TabsContent value="create" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2 text-primary">
+                <PlusCircle className="h-5 w-5" />
+                <span className="text-sm font-medium uppercase tracking-wide">Create</span>
+              </div>
+              <CardTitle>신규 상품 등록</CardTitle>
+              <CardDescription>Next.js API Route가 catalog-service로 REST 요청을 전달합니다.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-5" onSubmit={handleCreate}>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="create-name">상품명</Label>
+                    <Input
+                      id="create-name"
+                      required
+                      value={createForm.name}
+                      onChange={(event) => updateCreateForm('name', event.target.value)}
+                      placeholder="예: NestJS 티셔츠"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-sku">SKU (선택)</Label>
+                    <Input
+                      id="create-sku"
+                      value={createForm.sku}
+                      onChange={(event) => updateCreateForm('sku', event.target.value)}
+                      placeholder="SKU-001"
+                    />
+                  </div>
+                </div>
 
-        {productsState.status === 'success' && (
-          <div className="overflow-x-auto rounded-lg border border-slate-800">
-            <table className="min-w-full divide-y divide-slate-800 text-sm">
-              <thead className="bg-slate-900/60 text-left text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-4 py-3">상품명</th>
-                  <th className="px-4 py-3">가격</th>
-                  <th className="px-4 py-3">상태</th>
-                  <th className="px-4 py-3">관리</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800 bg-slate-900/20">
-                {productsState.items.map((product) => (
-                  <tr key={product.id} className="align-top">
-                    <td className="px-4 py-4">
-                      <p className="font-medium text-slate-100">{product.name}</p>
-                      {product.description && (
-                        <p className="mt-1 text-xs text-slate-400">{product.description}</p>
-                      )}
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        SKU: {product.sku ?? '미지정'} · ID: {product.id}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 text-slate-100">{toDisplayPrice(product.price)}</td>
-                    <td className="px-4 py-4 text-slate-100">
-                      <div className="space-y-2">
-                        <select
-                          value={statusSelection[product.id] ?? product.status}
-                          onChange={(event) =>
-                            setStatusSelection((prev) => ({
-                              ...prev,
-                              [product.id]: event.target.value
-                            }))
-                          }
-                          className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none"
-                        >
-                          {STATUS_OPTIONS.map((status) => (
-                            <option value={status} key={status}>
-                              {STATUS_LABELS[status] ?? status}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void updateStatus(product.id);
-                          }}
-                          className="w-full rounded-md border border-emerald-500 px-2 py-1 text-xs text-emerald-200 hover:bg-emerald-500/10"
-                        >
-                          상태 저장
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-slate-100">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(product)}
-                        className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-100 hover:border-emerald-500"
-                      >
-                        수정 폼에 불러오기
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {statusMessage && (
-          <p className="text-sm text-slate-300">{statusMessage}</p>
-        )}
-      </section>
+                <div className="space-y-2">
+                  <Label htmlFor="create-thumbnail">썸네일 URL (선택)</Label>
+                  <Input
+                    id="create-thumbnail"
+                    value={createForm.thumbnailUrl}
+                    onChange={(event) => updateCreateForm('thumbnailUrl', event.target.value)}
+                    placeholder="https://"
+                  />
+                </div>
 
-      <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-5">
-        <h2 className="text-xl font-semibold text-emerald-300">상품 정보 수정</h2>
-        {editTarget ? (
-          <p className="text-xs text-slate-400">
-            현재 선택된 상품: <span className="font-semibold">{editTarget.name}</span> (
-            {editTarget.id})
-          </p>
-        ) : (
-          <p className="text-xs text-slate-400">목록에서 수정할 상품을 먼저 선택하세요.</p>
-        )}
+                <div className="space-y-2">
+                  <Label htmlFor="create-description">설명</Label>
+                  <Textarea
+                    id="create-description"
+                    rows={3}
+                    value={createForm.description}
+                    onChange={(event) => updateCreateForm('description', event.target.value)}
+                    placeholder="상품 설명을 입력하세요."
+                  />
+                </div>
 
-        <form className="mt-4 space-y-4" onSubmit={handleEditSubmit}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">상품명</span>
-              <input
-                type="text"
-                value={editForm.name}
-                onChange={(event) => updateEditForm('name', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="create-price-amount">가격 (원 단위)</Label>
+                    <Input
+                      id="create-price-amount"
+                      type="number"
+                      min={1}
+                      required
+                      value={createForm.priceAmount}
+                      onChange={(event) => updateCreateForm('priceAmount', event.target.value)}
+                      placeholder="10000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>화폐 코드</Label>
+                    <Select
+                      value={createForm.priceCurrency}
+                      onValueChange={(value) => updateCreateForm('priceCurrency', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="KRW" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['KRW', 'USD', 'EUR'].map((currency) => (
+                          <SelectItem key={currency} value={currency}>
+                            {currency}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">SKU</span>
-              <input
-                type="text"
-                value={editForm.sku}
-                onChange={(event) => updateEditForm('sku', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
-          </div>
+                <Button type="submit" className="w-full" disabled={createState.status === 'submitting'}>
+                  {createState.status === 'submitting' ? '등록 중...' : '상품 등록'}
+                </Button>
+              </form>
 
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-200">설명</span>
-            <textarea
-              rows={3}
-              value={editForm.description}
-              onChange={(event) => updateEditForm('description', event.target.value)}
-              className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-            />
-          </label>
+              {createState.status === 'error' && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertTitle>등록 실패</AlertTitle>
+                  <AlertDescription>{createState.message}</AlertDescription>
+                </Alert>
+              )}
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">가격 (원 단위)</span>
-              <input
-                type="number"
-                min="1"
-                value={editForm.priceAmount}
-                onChange={(event) => updateEditForm('priceAmount', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
+              {createState.status === 'success' && (
+                <Alert variant="success" className="mt-4">
+                  <AlertTitle>등록 완료</AlertTitle>
+                  <AlertDescription>{createState.message}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">통화</span>
-              <input
-                type="text"
-                value={editForm.priceCurrency}
-                onChange={(event) => updateEditForm('priceCurrency', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm uppercase focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
+        <TabsContent value="manage" className="space-y-4">
+          {productsState.status === 'loading' && (
+            <Card className="border-border/70">
+              <CardContent className="space-y-3 p-6">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </CardContent>
+            </Card>
+          )}
 
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-200">썸네일 URL</span>
-              <input
-                type="url"
-                value={editForm.thumbnailUrl}
-                onChange={(event) => updateEditForm('thumbnailUrl', event.target.value)}
-                className="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </label>
-          </div>
+          {productsState.status === 'error' && (
+            <Alert variant="destructive">
+              <AlertTitle>상품 목록을 불러오지 못했습니다.</AlertTitle>
+              <AlertDescription>{productsState.message}</AlertDescription>
+            </Alert>
+          )}
 
-          <button
-            type="submit"
-            disabled={editState.status === 'submitting'}
-            className="rounded-md border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:text-slate-500"
-          >
-            {editState.status === 'submitting' ? '수정 중...' : '상품 정보 수정'}
-          </button>
-        </form>
+          {productsState.status === 'success' && (
+            <>
+              <Card>
+                <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ClipboardList className="h-5 w-5" />
+                      <span className="text-sm font-medium uppercase tracking-wide">Inventory</span>
+                    </div>
+                    <CardTitle>상품 상태 관리</CardTitle>
+                    <CardDescription>
+                      Catalog 서비스 상태 값은 Kafka 이벤트로 퍼블리시되어 Orders/Payments 읽기 모델과 동기화됩니다.
+                    </CardDescription>
+                  </div>
+                  {latestUpdateInfo && (
+                    <p className="text-sm text-muted-foreground">
+                      최근 업데이트: <span className="font-medium text-foreground">{latestUpdateInfo}</span>
+                    </p>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>상품</TableHead>
+                        <TableHead>상태</TableHead>
+                        <TableHead>가격</TableHead>
+                        <TableHead>상태 조정</TableHead>
+                        <TableHead className="text-right">작업</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {productsState.items.map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">{product.sku ?? 'SKU 미설정'}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{STATUS_LABELS[product.status] ?? product.status}</Badge>
+                          </TableCell>
+                          <TableCell>{toDisplayPrice(product.price)}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={statusSelection[product.id] ?? product.status}
+                              onValueChange={(value) =>
+                                setStatusSelection((prev) => ({
+                                  ...prev,
+                                  [product.id]: value
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STATUS_OPTIONS.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {STATUS_LABELS[option]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void updateStatus(product.id)}
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                상태 적용
+                              </Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => startEdit(product)}>
+                                <PencilLine className="mr-2 h-4 w-4" />
+                                세부 수정
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
 
-        {editState.status === 'error' && (
-          <p className="mt-3 rounded-md border border-rose-500 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
-            {editState.message}
-          </p>
-        )}
-        {editState.status === 'success' && (
-          <p className="mt-3 rounded-md border border-emerald-500 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
-            {editState.message ?? '상품 정보가 수정되었습니다.'}
-          </p>
-        )}
-      </section>
-    </div>
+              {statusMessage && (
+                <Alert variant="info">
+                  <AlertTitle>상태 업데이트</AlertTitle>
+                  <AlertDescription>{statusMessage}</AlertDescription>
+                </Alert>
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog
+        open={isEditDialogOpen && Boolean(editTarget)}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) {
+            setEditTarget(null);
+            setEditState({ status: 'idle' });
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>상품 수정</DialogTitle>
+            <DialogDescription>
+              {editTarget ? `${editTarget.name} (${editTarget.id.slice(0, 8)})` : '대상 상품을 선택하세요.'}
+            </DialogDescription>
+          </DialogHeader>
+          {editTarget ? (
+            <form className="space-y-4" onSubmit={handleEditSubmit}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">상품명</Label>
+                  <Input
+                    id="edit-name"
+                    value={editForm.name}
+                    onChange={(event) => updateEditForm('name', event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-sku">SKU</Label>
+                  <Input
+                    id="edit-sku"
+                    value={editForm.sku}
+                    onChange={(event) => updateEditForm('sku', event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">설명</Label>
+                <Textarea
+                  id="edit-description"
+                  rows={3}
+                  value={editForm.description}
+                  onChange={(event) => updateEditForm('description', event.target.value)}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-price-amount">가격</Label>
+                  <Input
+                    id="edit-price-amount"
+                    type="number"
+                    min={1}
+                    value={editForm.priceAmount}
+                    onChange={(event) => updateEditForm('priceAmount', event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-price-currency">화폐</Label>
+                  <Input
+                    id="edit-price-currency"
+                    value={editForm.priceCurrency}
+                    onChange={(event) => updateEditForm('priceCurrency', event.target.value)}
+                    className="uppercase"
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" disabled={editState.status === 'submitting'}>
+                {editState.status === 'submitting' ? '저장 중...' : '변경 사항 저장'}
+              </Button>
+
+              {editState.status === 'error' && (
+                <Alert variant="destructive">
+                  <AlertTitle>수정 실패</AlertTitle>
+                  <AlertDescription>{editState.message}</AlertDescription>
+                </Alert>
+              )}
+
+              {editState.status === 'success' && (
+                <Alert variant="success">
+                  <AlertTitle>수정 완료</AlertTitle>
+                  <AlertDescription>{editState.message}</AlertDescription>
+                </Alert>
+              )}
+            </form>
+          ) : (
+            <p className="text-sm text-muted-foreground">편집할 상품을 먼저 선택해주세요.</p>
+          )}
+        </DialogContent>
+      </Dialog>
+    </section>
   );
 }

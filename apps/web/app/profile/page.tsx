@@ -3,6 +3,14 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+
 type Profile = {
   id: string;
   email: string;
@@ -161,120 +169,129 @@ export default function ProfilePage(): JSX.Element {
   return (
     <section className="space-y-8">
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold">내 프로필</h2>
-        <p className="text-sm text-slate-300">
+        <h2 className="text-3xl font-semibold">내 프로필</h2>
+        <p className="text-sm text-muted-foreground">
           기본 정보를 확인하고 수정하거나 비밀번호를 변경할 수 있습니다.
         </p>
       </div>
 
-      {loadState.status === 'loading' && <p className="text-sm text-slate-400">프로필 정보를 불러오는 중...</p>}
+      {loadState.status === 'loading' && (
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      )}
 
       {loadState.status === 'error' && (
-        <div className="rounded-md border border-rose-500 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
-          <p>{loadState.message}</p>
-          <p className="mt-2">
-            <Link href="/login" className="text-rose-200 underline-offset-4 hover:underline">
-              로그인 화면으로 이동
-            </Link>
-          </p>
-        </div>
+        <Alert variant="destructive">
+          <AlertTitle>프로필 정보를 불러오지 못했습니다.</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>{loadState.message}</p>
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/login">로그인 화면으로 이동</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
       {loadState.status === 'success' && (
         <>
-          <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/40 px-4 py-3 text-sm">
-            <p><span className="text-slate-400">이메일</span>: {loadState.profile.email}</p>
-            <p><span className="text-slate-400">이름</span>: {loadState.profile.name ?? '미설정'}</p>
-            <button
-              type="button"
-              onClick={() => {
-                localStorage.removeItem(TOKEN_KEY);
-                fetch('/api/logout', { method: 'POST' }).finally(() => {
-                  setLoadState({ status: 'error', message: '로그아웃되었습니다. 다시 로그인해주세요.' });
-                });
-              }}
-              className="inline-flex items-center rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 transition hover:bg-slate-700"
-            >
-              로그아웃
-            </button>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle>계정 요약</CardTitle>
+                <CardDescription>
+                  JWT 토큰은 브라우저 Local Storage에 저장되며, 로그인 시점 기준으로 표시됩니다.
+                </CardDescription>
+              </div>
+              <Badge variant="secondary">User</Badge>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-center justify-between rounded-lg border border-border/60 px-4 py-3">
+                <span className="text-muted-foreground">이메일</span>
+                <span className="font-medium text-foreground">{loadState.profile.email}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/60 px-4 py-3">
+                <span className="text-muted-foreground">이름</span>
+                <span className="font-medium text-foreground">{loadState.profile.name ?? '미설정'}</span>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  localStorage.removeItem(TOKEN_KEY);
+                  fetch('/api/logout', { method: 'POST' }).finally(() => {
+                    setLoadState({ status: 'error', message: '로그아웃되었습니다. 다시 로그인해주세요.' });
+                  });
+                }}
+              >
+                로그아웃
+              </Button>
+            </CardContent>
+          </Card>
 
-          <form className="space-y-4" onSubmit={handleProfileSubmit}>
-            <h3 className="text-lg font-medium">프로필 수정</h3>
-            <div className="space-y-2">
-              <label htmlFor="name" className="block text-sm font-medium text-slate-200">
-                이름
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                defaultValue={loadState.profile.name ?? ''}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="표시할 이름"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isProfileSubmitting}
-              className="inline-flex items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600"
-            >
-              {isProfileSubmitting ? '저장 중...' : '프로필 저장'}
-            </button>
-          </form>
+          <Card>
+            <CardHeader>
+              <CardTitle>프로필 정보 수정</CardTitle>
+              <CardDescription>이름 필드만 수정 가능합니다. 수정 시 Auth 서비스에 즉시 반영됩니다.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-4" onSubmit={handleProfileSubmit}>
+                <div className="space-y-2">
+                  <Label htmlFor="name">이름</Label>
+                  <Input id="name" name="name" defaultValue={loadState.profile.name ?? ''} placeholder="홍길동" />
+                </div>
+                <Button type="submit" disabled={isProfileSubmitting} className="w-full">
+                  {isProfileSubmitting ? '저장 중...' : '프로필 저장'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-          <form className="space-y-4" onSubmit={handlePasswordSubmit}>
-            <h3 className="text-lg font-medium">비밀번호 변경</h3>
-            <div className="space-y-2">
-              <label htmlFor="currentPassword" className="block text-sm font-medium text-slate-200">
-                현재 비밀번호
-              </label>
-              <input
-                id="currentPassword"
-                name="currentPassword"
-                type="password"
-                required
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="현재 비밀번호"
-                autoComplete="current-password"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="newPassword" className="block text-sm font-medium text-slate-200">
-                새 비밀번호
-              </label>
-              <input
-                id="newPassword"
-                name="newPassword"
-                type="password"
-                minLength={8}
-                required
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="8자 이상 비밀번호"
-                autoComplete="new-password"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isPasswordSubmitting}
-              className="inline-flex items-center justify-center rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-600 disabled:cursor-not-allowed disabled:bg-slate-500"
-            >
-              {isPasswordSubmitting ? '변경 중...' : '비밀번호 변경'}
-            </button>
-          </form>
+          <Card>
+            <CardHeader>
+              <CardTitle>비밀번호 변경</CardTitle>
+              <CardDescription>현재 비밀번호를 검증한 뒤 새 비밀번호로 교체합니다. 최소 8자 이상 입력해주세요.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-4" onSubmit={handlePasswordSubmit}>
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword">현재 비밀번호</Label>
+                  <Input
+                    id="currentPassword"
+                    name="currentPassword"
+                    type="password"
+                    required
+                    placeholder="현재 비밀번호"
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">새 비밀번호</Label>
+                  <Input
+                    id="newPassword"
+                    name="newPassword"
+                    type="password"
+                    minLength={8}
+                    required
+                    placeholder="8자 이상 새 비밀번호"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <Button type="submit" disabled={isPasswordSubmitting} className="w-full">
+                  {isPasswordSubmitting ? '변경 중...' : '비밀번호 변경'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </>
       )}
 
       {message && (
-        <p
-          className={`rounded-md border px-4 py-3 text-sm ${
-            message.kind === 'success'
-              ? 'border-emerald-500 bg-emerald-950/30 text-emerald-200'
-              : 'border-rose-500 bg-rose-950/40 text-rose-200'
-          }`}
-        >
-          {message.message}
-        </p>
+        <Alert variant={message.kind === 'success' ? 'success' : 'destructive'}>
+          <AlertTitle>{message.kind === 'success' ? '완료' : '오류'}</AlertTitle>
+          <AlertDescription>{message.message}</AlertDescription>
+        </Alert>
       )}
     </section>
   );
